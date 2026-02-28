@@ -57,6 +57,10 @@ function dispatch(msg) {
     case 'sequencer:step':
       useSequencerStore().playingStep = msg.step
       break
+
+    case 'sequencer:transport':
+      useSequencerStore().transportState = msg.state
+      break
   }
 
   // External listeners

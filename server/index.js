@@ -6,6 +6,7 @@ import samplesRouter from './routes/samples.js'
 import sessionsRouter from './routes/sessions.js'
 import deviceRouter from './routes/device.js'
 import mixerRouter from './routes/mixer.js'
+import transportRouter from './routes/transport.js'
 
 const PORT = process.env.PORT || 3000
 
@@ -26,6 +27,7 @@ app.use('/api/samples', samplesRouter)
 app.use('/api/sessions', sessionsRouter)
 app.use('/api/device', deviceRouter)
 app.use('/api/mixer', mixerRouter)
+app.use('/api/transport', transportRouter)
 
 // Health check
 app.get('/api/health', (req, res) => {
