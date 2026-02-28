@@ -1,6 +1,7 @@
 import { ref, onUnmounted } from 'vue'
 import { useDeviceStore } from '@/stores/device'
 import { usePatchesStore } from '@/stores/patches'
+import { useMixerStore }   from '@/stores/mixer'
 
 let ws = null
 let reconnectTimer = null
@@ -49,6 +50,7 @@ function dispatch(msg) {
 
     case 'midi:cc':
       device.recordActivity()
+      useMixerStore().handleCC(msg)
       break
   }
 

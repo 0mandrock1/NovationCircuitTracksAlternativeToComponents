@@ -31,4 +31,16 @@ router.get('/status', (req, res) => {
   })
 })
 
+// POST /api/device/cc  — send a MIDI CC message
+router.post('/cc', (req, res) => {
+  const { channel, controller, value } = req.body
+  if (!midiManager.isConnected()) return res.status(503).json({ error: 'Device not connected' })
+  try {
+    midiManager.sendCC(channel, controller, Math.max(0, Math.min(127, value)))
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 export default router

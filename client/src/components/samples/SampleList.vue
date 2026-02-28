@@ -25,14 +25,13 @@ const store = useSamplesStore()
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
-  max-height: 560px;
-  overflow-y: auto;
 }
 
 .sample-list__loading {
   padding: var(--spacing-md);
   color: var(--color-text-muted);
   text-align: center;
+  font-size: 0.85rem;
 }
 
 .sample-list__items {
