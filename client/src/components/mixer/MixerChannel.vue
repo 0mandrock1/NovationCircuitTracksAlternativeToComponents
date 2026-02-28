@@ -1,5 +1,6 @@
 <script setup>
 import { useMixerStore } from '@/stores/mixer'
+import FxSends from './FxSends.vue'
 
 const props = defineProps({
   channel: { type: Object, required: true },
@@ -7,6 +8,11 @@ const props = defineProps({
 })
 
 const store = useMixerStore()
+
+function panLabel(val) {
+  if (val === 0) return 'C'
+  return val < 0 ? `L${Math.abs(val)}` : `R${val}`
+}
 </script>
 
 <template>
@@ -23,6 +29,17 @@ const store = useMixerStore()
       />
     </div>
     <div class="mixer-channel__value">{{ channel.volume }}</div>
+    <div class="mixer-channel__pan-wrap">
+      <input
+        type="range"
+        class="mixer-channel__pan"
+        min="-63" max="63"
+        :value="channel.pan"
+        @input="store.setPan(index, Number($event.target.value))"
+        title="Pan"
+      />
+      <span class="mixer-channel__pan-label">{{ panLabel(channel.pan) }}</span>
+    </div>
     <div class="mixer-channel__controls">
       <button
         class="mixer-channel__btn"
@@ -37,6 +54,7 @@ const store = useMixerStore()
         title="Solo"
       >S</button>
     </div>
+    <FxSends :channel="channel" :index="index" />
   </div>
 </template>
 
@@ -50,7 +68,7 @@ const store = useMixerStore()
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  width: 72px;
+  width: 86px;
   flex-shrink: 0;
   transition: opacity var(--transition-fast);
 }
@@ -89,6 +107,26 @@ const store = useMixerStore()
 .mixer-channel__value {
   font-family: var(--font-mono);
   font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.mixer-channel__pan-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.mixer-channel__pan {
+  width: 100%;
+  accent-color: var(--color-text-dim);
+  cursor: pointer;
+}
+
+.mixer-channel__pan-label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
   color: var(--color-text-muted);
 }
 
