@@ -1,14 +1,14 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref } from 'vue'
 import AppHeader      from '@/components/layout/AppHeader.vue'
 import TabNav         from '@/components/layout/TabNav.vue'
 import StatusBar      from '@/components/layout/StatusBar.vue'
 import ToastContainer from '@/components/ui/ToastContainer.vue'
+import ShortcutsModal from '@/components/ui/ShortcutsModal.vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useToast }     from '@/composables/useToast'
+import { useKeyboard }  from '@/composables/useKeyboard'
 
-const router = useRouter()
 const { toast } = useToast()
 
 // Listen for device connect/disconnect events
@@ -18,29 +18,9 @@ on('device:status', (msg) => {
   else                toast(`Connected: ${msg.port}`, { type: 'success' })
 })
 
-// ── Keyboard shortcuts (numbers 1–7 → tabs) ──────────────────────────────────
-const TAB_KEYS = {
-  '1': '/patches',
-  '2': '/samples',
-  '3': '/sequencer',
-  '4': '/mixer',
-  '5': '/midi',
-  '6': '/sessions',
-  '7': '/device',
-}
-
-function onKeyDown(e) {
-  const tag = document.activeElement?.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-
-  const route = TAB_KEYS[e.key]
-  if (route && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    router.push(route)
-  }
-}
-
-onMounted(() => window.addEventListener('keydown', onKeyDown))
-onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
+// Shortcuts modal
+const showShortcuts = ref(false)
+useKeyboard(() => { showShortcuts.value = !showShortcuts.value })
 </script>
 
 <template>
@@ -52,6 +32,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
     </main>
     <StatusBar />
     <ToastContainer />
+    <ShortcutsModal :show="showShortcuts" @close="showShortcuts = false" />
   </div>
 </template>
 
