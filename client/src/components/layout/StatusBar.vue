@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useDeviceStore } from '@/stores/device'
+import { useWebSocket } from '@/composables/useWebSocket'
 
 const device = useDeviceStore()
 const midiIn = ref(false)
@@ -19,6 +20,14 @@ function flashOut() {
   clearTimeout(outTimer)
   outTimer = setTimeout(() => { midiOut.value = false }, 80)
 }
+
+// Flash IN on any incoming MIDI from device
+const { on } = useWebSocket()
+on('midi:cc',    flashIn)
+on('midi:sysex', flashIn)
+
+// Flash OUT whenever a CC or SysEx is sent to the device
+watch(() => device.midiOutCount, flashOut)
 
 onUnmounted(() => {
   clearTimeout(inTimer)

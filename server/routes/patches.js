@@ -11,6 +11,7 @@ import {
   defaultPatchBytes,
   decodePatchName,
   rawBytesToParams,
+  paramsToBytesPartial,
 } from '../midi/SysExBuilder.js'
 import { parseSysEx } from '../midi/SysExParser.js'
 import {
@@ -183,6 +184,11 @@ router.put('/:index', (req, res) => {
     s.rawBytes = Array.from(req.body.rawBytes)
     s.params   = rawBytesToParams(s.rawBytes)
     s.name     = decodePatchName(s.rawBytes)
+  }
+  if (req.body.params !== undefined) {
+    const existing = s.rawBytes ?? Array.from(defaultPatchBytes(index))
+    s.rawBytes = Array.from(paramsToBytesPartial(req.body.params, existing))
+    s.params   = rawBytesToParams(s.rawBytes)
   }
   res.json({ ok: true, index, name: s.name })
 })

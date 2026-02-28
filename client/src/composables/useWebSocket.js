@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+import { onUnmounted } from 'vue'
 import { useDeviceStore } from '@/stores/device'
 import { usePatchesStore } from '@/stores/patches'
 import { useMixerStore }   from '@/stores/mixer'

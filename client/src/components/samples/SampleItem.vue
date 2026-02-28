@@ -116,7 +116,7 @@ function fmt(bytes) {
           v-for="i in 32"
           :key="i"
           class="si__wave-bar"
-          :style="{ height: `${20 + Math.sin(i * 0.8 + index) * 15 + Math.random() * 5}%` }"
+          :style="{ height: `${20 + Math.sin(i * 0.8 + index) * 15 + Math.abs(Math.sin(i * 2.3 + index * 0.7)) * 5}%` }"
         />
       </template>
     </div>

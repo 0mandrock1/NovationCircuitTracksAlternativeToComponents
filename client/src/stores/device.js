@@ -7,6 +7,7 @@ export const useDeviceStore = defineStore('device', () => {
   const firmwareVersion = ref('')
   const availablePorts = ref([])
   const lastActivity = ref(null)
+  const midiOutCount = ref(0)
 
   const statusText = computed(() => {
     if (connected.value) return `Connected: ${portName.value}`
@@ -54,18 +55,24 @@ export const useDeviceStore = defineStore('device', () => {
     lastActivity.value = Date.now()
   }
 
+  function recordMidiOut() {
+    midiOutCount.value++
+  }
+
   return {
     connected,
     portName,
     firmwareVersion,
     availablePorts,
     lastActivity,
+    midiOutCount,
     statusText,
     fetchPorts,
     connect,
     disconnect,
     setConnected,
     setDisconnected,
-    recordActivity
+    recordActivity,
+    recordMidiOut,
   }
 })

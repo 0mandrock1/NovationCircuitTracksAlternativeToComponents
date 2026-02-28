@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useDeviceStore } from '@/stores/device'
 
 function _emptySlot(index) {
   return { index, name: `Patch ${index + 1}`, hasData: false, params: null }
@@ -61,7 +62,20 @@ export const usePatchesStore = defineStore('patches', () => {
 
   async function sendToDevice(index) {
     activePatchIndex.value = index
+    useDeviceStore().recordMidiOut()
     return (await fetch(`/api/patches/${index}/send?${_tq()}`, { method: 'POST' })).json()
+  }
+
+  // PUT updated params to server (rebuilds rawBytes), then audition on device
+  async function updateAndSendParams(index) {
+    const params = patches.value[activeTrack.value][index]?.params
+    if (!params) return
+    await fetch(`/api/patches/${index}?${_tq()}`, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ params }),
+    })
+    return sendToDevice(index)
   }
 
   async function writePatchToDevice(index) {
@@ -135,7 +149,7 @@ export const usePatchesStore = defineStore('patches', () => {
     patches, activeTrack, activePatchIndex, activePatch,
     loading, fetchingAll, error,
     fetchPatches, fetchFromDevice, fetchAllFromDevice,
-    sendToDevice, writePatchToDevice,
+    sendToDevice, writePatchToDevice, updateAndSendParams,
     exportPatchSyx, exportBankSyx, importSyx,
     renamePatch, deletePatch,
     handleWsPatchUpdate, handleWsCurrentDump,

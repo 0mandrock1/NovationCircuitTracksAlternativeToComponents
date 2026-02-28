@@ -24,8 +24,8 @@ async function update(path, value) {
   if (!obj) return
   obj[parts[parts.length - 1]] = value
 
-  // Mirror to device via REST (no-wait for smooth UX)
-  await store.sendToDevice(props.patchIndex)
+  // PUT updated params to server (rebuilds rawBytes), then audition on device
+  await store.updateAndSendParams(props.patchIndex)
 }
 
 // Named aliases for template readability

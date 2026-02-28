@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { useDeviceStore } from '@/stores/device'
 
 // MIDI CC assignments for each channel (Circuit Tracks standard)
 // Volume = CC7, Pan = CC10, ReverbSend = CC91, DelaySend = CC93
@@ -17,6 +18,7 @@ export const useMixerStore = defineStore('mixer', () => {
 
   // Send MIDI CC to server (fire-and-forget)
   function _sendCC(midiChannel, cc, value) {
+    useDeviceStore().recordMidiOut()
     fetch('/api/device/cc', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
