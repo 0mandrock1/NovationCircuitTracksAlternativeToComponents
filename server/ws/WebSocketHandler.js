@@ -91,6 +91,12 @@ export function setupWebSocket(server) {
   // Broadcast MIDI-out activity to all clients when server sends SysEx
   midiManager.on('sysexout', () => wss.broadcast({ type: 'midi:out' }))
 
+  // Broadcast sequencer step from MIDI clock
+  midiManager.on('clock:step', (step) => wss.broadcast({ type: 'sequencer:step', step }))
+
+  // Broadcast transport state changes
+  midiManager.on('transport', (state) => wss.broadcast({ type: 'sequencer:transport', state }))
+
   return wss
 }
 

@@ -86,6 +86,12 @@ onUnmounted(() => {
   padding: var(--spacing-md);
 }
 
+@media (max-width: 768px) {
+  .app-content {
+    padding: var(--spacing-sm);
+  }
+}
+
 /* ── Toast ──────────────────────────────────────────────────────────────── */
 .toast {
   position: fixed;

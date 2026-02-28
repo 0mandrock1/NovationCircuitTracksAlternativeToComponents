@@ -6,6 +6,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   const activeProject     = ref(null)
   const activeProjectIndex = ref(-1)
   const loading           = ref(false)
+  const packs             = ref(Array.from({ length: 32 }, (_, i) => ({ index: i, name: `Pack ${i + 1}`, sampleCount: 0 })))
 
   async function fetchProjects() {
     loading.value = true
@@ -81,6 +82,31 @@ export const useSessionsStore = defineStore('sessions', () => {
     return result
   }
 
+  async function fetchPacks() {
+    const res  = await fetch('/api/sessions/packs')
+    const data = await res.json()
+    data.packs.forEach((p, i) => { packs.value[i] = p })
+  }
+
+  async function renamePack(index, name) {
+    const res  = await fetch(`/api/sessions/packs/${index}`, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name }),
+    })
+    const data = await res.json()
+    if (data.ok) packs.value[index].name = data.pack.name
+    return data
+  }
+
+  function exportPack(index) {
+    const name = packs.value[index]?.name ?? `pack_${index}`
+    const a    = document.createElement('a')
+    a.href     = `/api/sessions/packs/${index}/export`
+    a.download = `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`
+    a.click()
+  }
+
   async function renameScene(projectIndex, sceneIndex, name) {
     const res  = await fetch(`/api/sessions/${projectIndex}/scenes/${sceneIndex}`, {
       method:  'PUT',
@@ -95,9 +121,10 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   return {
-    projects, activeProject, activeProjectIndex, loading,
-    fetchProjects, selectProject,
+    projects, activeProject, activeProjectIndex, loading, packs,
+    fetchProjects, fetchPacks, selectProject,
     renameProject, copyProject, deleteProject,
     exportProject, importProject, renameScene,
+    renamePack, exportPack,
   }
 })

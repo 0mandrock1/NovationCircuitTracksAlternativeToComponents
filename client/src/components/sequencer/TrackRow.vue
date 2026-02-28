@@ -87,5 +87,6 @@ const store = useSequencerStore()
   display: flex;
   gap: 2px;
   flex: 1;
+  min-width: max-content;
 }
 </style>

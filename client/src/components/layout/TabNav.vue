@@ -37,6 +37,21 @@ const tabs = [
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.tab-nav::-webkit-scrollbar { display: none; }
+
+@media (max-width: 768px) {
+  .tab-nav {
+    padding: 0 var(--spacing-xs);
+    gap: 0;
+  }
+  .tab-nav__tab {
+    padding: var(--spacing-sm) var(--spacing-sm);
+    font-size: 0.78rem;
+  }
 }
 
 .tab-nav__tab {

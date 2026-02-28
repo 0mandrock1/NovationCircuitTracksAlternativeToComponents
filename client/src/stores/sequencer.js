@@ -22,6 +22,8 @@ export const useSequencerStore = defineStore('sequencer', () => {
   const patterns = ref(Array.from({ length: 8 }, () => createEmptyPattern()))
   const activePatternIndex = ref(0)
   const playingStep = ref(-1)
+  // 'stopped' | 'playing' | 'continued'
+  const transportState = ref('stopped')
 
   const activePattern = computed(() => patterns.value[activePatternIndex.value])
 
@@ -38,5 +40,5 @@ export const useSequencerStore = defineStore('sequencer', () => {
     activePattern.value.tracks[trackIndex].muted = !activePattern.value.tracks[trackIndex].muted
   }
 
-  return { patterns, activePatternIndex, playingStep, activePattern, toggleStep, updateStep, toggleMute }
+  return { patterns, activePatternIndex, playingStep, transportState, activePattern, toggleStep, updateStep, toggleMute }
 })

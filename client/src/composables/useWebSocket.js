@@ -1,6 +1,8 @@
 import { ref, onUnmounted } from 'vue'
 import { useDeviceStore } from '@/stores/device'
 import { usePatchesStore } from '@/stores/patches'
+import { useMixerStore } from '@/stores/mixer'
+import { useSequencerStore } from '@/stores/sequencer'
 
 let ws = null
 let reconnectTimer = null
@@ -49,6 +51,15 @@ function dispatch(msg) {
 
     case 'midi:cc':
       device.recordActivity()
+      useMixerStore().applyIncomingCC(msg.channel, msg.controller, msg.value)
+      break
+
+    case 'sequencer:step':
+      useSequencerStore().playingStep = msg.step
+      break
+
+    case 'sequencer:transport':
+      useSequencerStore().transportState = msg.state
       break
   }
 

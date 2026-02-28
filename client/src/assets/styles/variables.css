@@ -44,4 +44,7 @@
   /* Transitions */
   --transition-fast: 0.1s ease;
   --transition-normal: 0.2s ease;
+
+  /* Content padding (reduced on mobile via media query) */
+  --app-content-padding: var(--spacing-md);
 }

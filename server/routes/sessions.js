@@ -4,6 +4,7 @@ const router = Router()
 
 const PROJECT_COUNT = 64
 const SCENE_COUNT   = 8
+const PACK_COUNT    = 32
 
 function _emptyProject(i) {
   return {
@@ -19,10 +20,53 @@ function _emptyProject(i) {
 }
 
 const projects = Array.from({ length: PROJECT_COUNT }, (_, i) => _emptyProject(i))
+const packs    = Array.from({ length: PACK_COUNT },    (_, i) => ({
+  index: i,
+  name:  `Pack ${i + 1}`,
+  sampleCount: 0,
+}))
 
 // ── GET /api/sessions ─────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
   res.json({ projects: projects.map(p => ({ index: p.index, name: p.name, color: p.color })) })
+})
+
+// ── Pack routes (before /:index to avoid conflicts) ───────────────────────────
+
+// GET /api/sessions/packs — list all 32 packs
+router.get('/packs', (req, res) => {
+  res.json({ packs })
+})
+
+// PUT /api/sessions/packs/:index — rename a pack
+router.put('/packs/:index', (req, res) => {
+  const index = parseInt(req.params.index, 10)
+  if (index < 0 || index >= PACK_COUNT) return res.status(400).json({ error: 'Invalid index' })
+  if (req.body.name !== undefined) packs[index].name = String(req.body.name).slice(0, 16)
+  res.json({ ok: true, pack: packs[index] })
+})
+
+// GET /api/sessions/packs/:index/export — export pack as JSON stub
+router.get('/packs/:index/export', (req, res) => {
+  const index = parseInt(req.params.index, 10)
+  if (index < 0 || index >= PACK_COUNT) return res.status(400).json({ error: 'Invalid index' })
+  const safeName = packs[index].name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 32) || `pack_${index}`
+  res.setHeader('Content-Type', 'application/json')
+  res.setHeader('Content-Disposition', `attachment; filename="${safeName}.json"`)
+  res.json(packs[index])
+})
+
+// ── POST /api/sessions/import  — import project from JSON ─────────────────────
+router.post('/import', (req, res) => {
+  const { index, data } = req.body
+  const i = parseInt(index ?? -1, 10)
+  if (i < 0 || i >= PROJECT_COUNT) return res.status(400).json({ error: 'Invalid index' })
+  if (!data || typeof data !== 'object') return res.status(400).json({ error: 'Missing data' })
+
+  const incoming = { ...data, index: i }
+  if (typeof incoming.name !== 'string') return res.status(400).json({ error: 'Invalid project data' })
+  projects[i] = { ..._emptyProject(i), ...incoming, index: i }
+  res.json({ ok: true, project: projects[i] })
 })
 
 // ── GET /api/sessions/:index ──────────────────────────────────────────────────
@@ -59,7 +103,7 @@ router.delete('/:index', (req, res) => {
   res.json({ ok: true })
 })
 
-// ── GET /api/sessions/:index/export  — export project as JSON wrapped in .syx extension ─────
+// ── GET /api/sessions/:index/export  — export project as JSON ─────────────────
 router.get('/:index/export', (req, res) => {
   const index = parseInt(req.params.index, 10)
   if (index < 0 || index >= PROJECT_COUNT) return res.status(400).json({ error: 'Invalid index' })
@@ -67,19 +111,6 @@ router.get('/:index/export', (req, res) => {
   res.setHeader('Content-Type', 'application/json')
   res.setHeader('Content-Disposition', `attachment; filename="${safeName}.json"`)
   res.json(projects[index])
-})
-
-// ── POST /api/sessions/import  — import project from JSON ─────────────────────
-router.post('/import', (req, res) => {
-  const { index, data } = req.body
-  const i = parseInt(index ?? -1, 10)
-  if (i < 0 || i >= PROJECT_COUNT) return res.status(400).json({ error: 'Invalid index' })
-  if (!data || typeof data !== 'object') return res.status(400).json({ error: 'Missing data' })
-
-  const incoming = { ...data, index: i }
-  if (typeof incoming.name !== 'string') return res.status(400).json({ error: 'Invalid project data' })
-  projects[i] = { ..._emptyProject(i), ...incoming, index: i }
-  res.json({ ok: true, project: projects[i] })
 })
 
 // ── PUT /api/sessions/:index/scenes/:sceneIndex ─── update scene ──────────────

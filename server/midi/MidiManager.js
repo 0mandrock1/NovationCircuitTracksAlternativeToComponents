@@ -16,6 +16,9 @@ class MidiManager {
     this._lastSysExTime = 0
     // pending sysex response resolvers: Map<cmdByte, { resolve, reject, timer }>
     this._pendingResponses = new Map()
+    // MIDI clock state
+    this._clockTicks    = 0
+    this._clockPlaying  = false
   }
 
   getAvailablePorts() {
@@ -50,10 +53,14 @@ class MidiManager {
     this.output = new easymidi.Output(portName)
     this.portName = portName
 
-    this.input.on('sysex',   (msg) => this._onSysEx(msg))
-    this.input.on('cc',      (msg) => this._emit('cc', msg))
-    this.input.on('noteon',  (msg) => this._emit('noteon', msg))
-    this.input.on('noteoff', (msg) => this._emit('noteoff', msg))
+    this.input.on('sysex',    (msg) => this._onSysEx(msg))
+    this.input.on('cc',       (msg) => this._emit('cc', msg))
+    this.input.on('noteon',   (msg) => this._emit('noteon', msg))
+    this.input.on('noteoff',  (msg) => this._emit('noteoff', msg))
+    this.input.on('clock',    ()    => this._onClock())
+    this.input.on('start',    ()    => { this._clockTicks = 0; this._clockPlaying = true; this._emit('transport', 'start') })
+    this.input.on('stop',     ()    => { this._clockPlaying = false; this._emit('transport', 'stop') })
+    this.input.on('continue', ()    => { this._clockPlaying = true;  this._emit('transport', 'continue') })
 
     return true
   }
@@ -116,6 +123,35 @@ class MidiManager {
   sendCC(channel, controller, value) {
     if (!this.output) throw new Error('Not connected')
     this.output.send('cc', { channel, controller, value })
+  }
+
+  sendStart() {
+    if (!this.output) throw new Error('Not connected')
+    this.output.send('start', {})
+  }
+
+  sendStop() {
+    if (!this.output) throw new Error('Not connected')
+    this.output.send('stop', {})
+  }
+
+  sendContinue() {
+    if (!this.output) throw new Error('Not connected')
+    this.output.send('continue', {})
+  }
+
+  // ── MIDI Clock handling ──────────────────────────────────────────────────────
+
+  _onClock() {
+    if (!this._clockPlaying) return
+    this._clockTicks++
+    // 6 ticks per 1/16 step (24 ppqn / 4 = 6 ticks per 16th note)
+    if (this._clockTicks % 6 === 0) {
+      const step = (this._clockTicks / 6 - 1) % 32
+      this._emit('clock:step', step)
+    }
+    // Reset after 32 steps (192 ticks)
+    if (this._clockTicks >= 192) this._clockTicks = 0
   }
 
   // ── Event system ────────────────────────────────────────────────────────────

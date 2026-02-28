@@ -11,7 +11,8 @@ import ModMatrix      from '@/components/patches/ModMatrix.vue'
 const store  = usePatchesStore()
 const device = useDeviceStore()
 
-const subTab = ref('synth')
+const subTab      = ref('synth')
+const sidebarOpen = ref(false)
 const SUB_TABS = [
   { id: 'synth',  label: 'Synth'      },
   { id: 'macros', label: 'Macros'     },
@@ -24,9 +25,27 @@ onMounted(() => store.fetchPatches())
 
 <template>
   <div class="patches-view">
-    <aside class="patches-view__sidebar">
+    <!-- Mobile sidebar toggle -->
+    <button
+      class="patches-view__sidebar-toggle"
+      @click="sidebarOpen = !sidebarOpen"
+      :aria-label="sidebarOpen ? 'Close patch list' : 'Open patch list'"
+    >{{ sidebarOpen ? '✕ Close' : '☰ Patches' }}</button>
+
+    <!-- Sidebar: always visible on desktop, drawer on mobile -->
+    <aside
+      class="patches-view__sidebar"
+      :class="{ 'patches-view__sidebar--open': sidebarOpen }"
+    >
       <PatchList />
     </aside>
+
+    <!-- Backdrop for mobile drawer -->
+    <div
+      v-if="sidebarOpen"
+      class="patches-view__backdrop"
+      @click="sidebarOpen = false"
+    />
 
     <div class="patches-view__main">
       <!-- Toolbar -->
@@ -94,12 +113,72 @@ onMounted(() => store.fetchPatches())
   gap: var(--spacing-md);
   height: 100%;
   overflow: hidden;
+  position: relative;
+}
+
+.patches-view__sidebar-toggle {
+  display: none;
 }
 
 .patches-view__sidebar {
   width: 220px;
   flex-shrink: 0;
   overflow-y: auto;
+}
+
+.patches-view__backdrop {
+  display: none;
+}
+
+/* ── Mobile (< 1024px): sidebar becomes a slide-in drawer ────────────────── */
+@media (max-width: 1024px) {
+  .patches-view__sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+    align-self: flex-start;
+    order: -1;
+  }
+
+  .patches-view__sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
+    overflow-y: auto;
+    padding: var(--spacing-md);
+  }
+
+  .patches-view__sidebar--open {
+    transform: translateX(0);
+  }
+
+  .patches-view__backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 199;
+  }
+
+  .patches-view__main {
+    width: 100%;
+  }
 }
 
 .patches-view__main {
