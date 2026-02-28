@@ -1,16 +1,20 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useSequencerStore } from '@/stores/sequencer'
 
 const props = defineProps({
-  step: { type: Object, required: true },
-  stepIndex: { type: Number, required: true },
+  step:       { type: Object, required: true },
+  stepIndex:  { type: Number, required: true },
   trackIndex: { type: Number, required: true },
-  isPlaying: { type: Boolean, default: false }
+  isPlaying:  { type: Boolean, default: false },
+  trackColor: { type: String, default: 'var(--color-accent)' }
 })
 
 const store = useSequencerStore()
 const showParams = ref(false)
+
+// Used by v-bind() in <style scoped>
+const activeColor = computed(() => props.trackColor)
 
 function onClick() {
   store.toggleStep(props.trackIndex, props.stepIndex)
@@ -99,8 +103,8 @@ function onUpdate(key, value) {
 }
 
 .step-cell--active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: v-bind(activeColor);
+  border-color: v-bind(activeColor);
 }
 
 .step-cell--has-params::after {
@@ -149,7 +153,7 @@ function onUpdate(key, value) {
 
 .step-params__row input[type=range] {
   flex: 1;
-  accent-color: var(--color-accent);
+  accent-color: v-bind(activeColor);
 }
 
 .step-params__row span {

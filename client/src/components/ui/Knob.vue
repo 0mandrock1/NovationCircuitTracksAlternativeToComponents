@@ -51,7 +51,7 @@ const valuePath = computed(() => {
 
 const indicatorEnd = computed(() => polarToXY(angle.value, r.value - 5))
 
-// ── Drag interaction ──────────────────────────────────────────────────────────
+// ── Mouse drag ────────────────────────────────────────────────────────────────
 function onMousedown(e) {
   if (editing.value) return
   e.preventDefault()
@@ -64,10 +64,10 @@ function onMousedown(e) {
 
 function onMousemove(e) {
   if (!dragging.value) return
-  const delta   = startY - e.clientY
-  const range   = props.max - props.min
-  const speed   = e.shiftKey ? 0.2 : 1  // shift = fine control
-  const newVal  = Math.round(Math.max(props.min, Math.min(props.max, startVal + delta * speed * (range / 150))))
+  const delta  = startY - e.clientY
+  const range  = props.max - props.min
+  const speed  = e.shiftKey ? 0.2 : 1  // shift = fine control
+  const newVal = Math.round(Math.max(props.min, Math.min(props.max, startVal + delta * speed * (range / 150))))
   emit('update:modelValue', newVal)
 }
 
@@ -75,6 +75,28 @@ function onMouseup() {
   dragging.value = false
   window.removeEventListener('mousemove', onMousemove)
   window.removeEventListener('mouseup',   onMouseup)
+}
+
+// ── Touch drag (parallels mouse logic; preventDefault stops page scroll) ─────
+function onTouchstart(e) {
+  if (editing.value) return
+  e.preventDefault()
+  dragging.value = true
+  startY   = e.touches[0].clientY
+  startVal = props.modelValue
+}
+
+function onTouchmove(e) {
+  if (!dragging.value) return
+  e.preventDefault()
+  const delta  = startY - e.touches[0].clientY
+  const range  = props.max - props.min
+  const newVal = Math.round(Math.max(props.min, Math.min(props.max, startVal + delta * (range / 150))))
+  emit('update:modelValue', newVal)
+}
+
+function onTouchend() {
+  dragging.value = false
 }
 
 // ── Double-click to type a value ──────────────────────────────────────────────
@@ -109,6 +131,9 @@ onUnmounted(() => {
         :width="size"
         :height="size"
         @mousedown="onMousedown"
+        @touchstart="onTouchstart"
+        @touchmove="onTouchmove"
+        @touchend="onTouchend"
         class="knob__svg"
         :class="{ 'knob__svg--dragging': dragging }"
       >
@@ -161,7 +186,12 @@ export default {
 
 .knob__svg-wrap { position: relative; }
 
-.knob__svg { cursor: ns-resize; display: block; }
+.knob__svg {
+  cursor: ns-resize;
+  display: block;
+  /* Prevent default touch scroll while dragging the knob */
+  touch-action: none;
+}
 .knob__svg--dragging { cursor: grabbing; }
 
 .knob__value {

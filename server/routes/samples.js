@@ -1,9 +1,10 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { join, extname } from 'path'
-import { existsSync, mkdirSync, unlinkSync, createReadStream } from 'fs'
+import { existsSync, mkdirSync, unlinkSync, renameSync, statSync, createReadStream } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
+import { spawn } from 'child_process'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const SAMPLES_DIR = join(__dirname, '../../data/samples')
@@ -12,12 +13,23 @@ if (!existsSync(SAMPLES_DIR)) {
   mkdirSync(SAMPLES_DIR, { recursive: true })
 }
 
+function convertWithFfmpeg(src, dst) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', ['-y', '-i', src, '-ar', '48000', '-ac', '1', '-sample_fmt', 's16', dst])
+    proc.on('close', code => {
+      if (code === 0) resolve()
+      else reject(new Error(`ffmpeg exited with code ${code}`))
+    })
+    proc.on('error', reject)
+  })
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, SAMPLES_DIR),
   filename: (req, file, cb) => {
     const index = req.params.index
     const ext = extname(file.originalname) || '.wav'
-    cb(null, `sample_${index}${ext}`)
+    cb(null, `sample_${index}_src${ext}`)
   }
 })
 
@@ -103,7 +115,7 @@ router.put('/:index/rename', (req, res) => {
   res.json({ ok: true, sample: sampleBank[index] })
 })
 
-router.post('/:index/upload', upload.single('file'), (req, res) => {
+router.post('/:index/upload', upload.single('file'), async (req, res) => {
   const index = parseInt(req.params.index, 10)
   if (index < 0 || index >= 64) {
     return res.status(400).json({ error: 'Invalid sample index' })
@@ -111,14 +123,38 @@ router.post('/:index/upload', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded or unsupported format' })
   }
+
+  const srcPath = req.file.path
+  const dstFilename = `sample_${index}.wav`
+  const dstPath = join(SAMPLES_DIR, dstFilename)
+
+  // Remove previously stored file if it differs from the target
   const oldFilename = sampleBank[index].filename
-  if (oldFilename && oldFilename !== req.file.filename) {
+  if (oldFilename && oldFilename !== dstFilename) {
     const oldPath = join(SAMPLES_DIR, oldFilename)
     if (existsSync(oldPath)) unlinkSync(oldPath)
   }
-  sampleBank[index].filename = req.file.filename
-  sampleBank[index].size = req.file.size
-  res.json({ ok: true, sample: sampleBank[index] })
+
+  try {
+    await convertWithFfmpeg(srcPath, dstPath)
+    // Delete temp source only after successful conversion
+    unlinkSync(srcPath)
+    sampleBank[index].filename = dstFilename
+    sampleBank[index].size = statSync(dstPath).size
+    res.json({ ok: true, sample: sampleBank[index] })
+  } catch (err) {
+    // ffmpeg not found or conversion failed — store original as-is
+    const ext = extname(req.file.originalname) || '.wav'
+    const fallbackFilename = `sample_${index}${ext}`
+    const fallbackPath = join(SAMPLES_DIR, fallbackFilename)
+    if (srcPath !== fallbackPath) renameSync(srcPath, fallbackPath)
+    sampleBank[index].filename = fallbackFilename
+    sampleBank[index].size = req.file.size
+    const warning = err.code === 'ENOENT'
+      ? 'ffmpeg not found, stored as-is'
+      : 'Conversion failed, stored as-is'
+    res.json({ ok: true, sample: sampleBank[index], warning })
+  }
 })
 
 router.delete('/:index', (req, res) => {

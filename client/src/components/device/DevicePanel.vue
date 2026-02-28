@@ -1,13 +1,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useDeviceStore } from '@/stores/device'
+import { useToast } from '@/composables/useToast'
 
 const device = useDeviceStore()
+const { toast } = useToast()
 
-const tempo       = ref(120)
-const swing       = ref(0)
-const transpose   = ref(0)
-const applyStatus = ref('')
+const tempo     = ref(120)
+const swing     = ref(0)
+const transpose = ref(0)
 
 onMounted(() => {
   device.fetchPorts()
@@ -41,11 +42,11 @@ async function postSetting(endpoint, body) {
       body:    JSON.stringify(body),
     })
     const data = await res.json()
-    applyStatus.value = data.ok ? 'Sent ✓' : (data.error ?? 'Error')
+    if (data.ok) toast('Sent', { type: 'success', duration: 2000 })
+    else         toast(data.error ?? 'Error', { type: 'error' })
   } catch {
-    applyStatus.value = 'No device'
+    toast('No device', { type: 'error' })
   }
-  setTimeout(() => { applyStatus.value = '' }, 2000)
 }
 </script>
 
@@ -140,7 +141,6 @@ async function postSetting(endpoint, body) {
         <button class="btn btn--sm btn--secondary" @click="applyTranspose">Apply</button>
       </div>
 
-      <div v-if="applyStatus" class="gs-status">{{ applyStatus }}</div>
     </section>
 
     <!-- Firmware -->
@@ -294,13 +294,6 @@ async function postSetting(endpoint, body) {
   width: 36px;
   text-align: right;
   flex-shrink: 0;
-}
-
-.gs-status {
-  font-size: 0.78rem;
-  color: var(--color-success);
-  font-family: var(--font-mono);
-  padding-top: var(--spacing-xs);
 }
 
 /* ── Firmware ────────────────────────────────────────────────────────────────── */

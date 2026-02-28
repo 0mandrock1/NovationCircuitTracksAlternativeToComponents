@@ -5,6 +5,10 @@ import router from './router'
 import { initWebSocket } from '@/composables/useWebSocket'
 import '@/assets/styles/main.css'
 
+// Restore saved theme before first render
+const savedTheme = localStorage.getItem('theme')
+if (savedTheme) document.documentElement.dataset.theme = savedTheme
+
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
