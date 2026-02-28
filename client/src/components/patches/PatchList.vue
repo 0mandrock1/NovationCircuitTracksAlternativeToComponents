@@ -68,13 +68,21 @@ function cancelRename() {
           class="patch-list__actions"
           @click.stop
         >
-          <!-- Send to device -->
+          <!-- Send to device (audition) -->
           <button
             class="patch-list__btn"
             :disabled="!device.connected || !patch.hasData"
-            :title="device.connected ? 'Send to device (audition)' : 'Connect device first'"
+            :title="device.connected ? 'Audition on device' : 'Connect device first'"
             @click="store.sendToDevice(patch.index)"
           >▶</button>
+
+          <!-- Write to bank slot -->
+          <button
+            class="patch-list__btn"
+            :disabled="!device.connected || !patch.hasData"
+            :title="device.connected ? 'Write to device bank slot' : 'Connect device first'"
+            @click="store.writePatchToDevice(patch.index)"
+          >✦</button>
 
           <!-- Export .syx -->
           <button
@@ -90,6 +98,13 @@ function cancelRename() {
             title="Rename"
             @click="startRename(patch.index, patch.name)"
           >✎</button>
+
+          <!-- Delete -->
+          <button
+            class="patch-list__btn patch-list__btn--danger"
+            title="Clear patch slot"
+            @click="store.deletePatch(patch.index)"
+          >✕</button>
         </div>
       </li>
     </ul>
@@ -205,4 +220,9 @@ export default {
 }
 
 .patch-list__btn:disabled { opacity: 0.3; cursor: default; }
+
+.patch-list__btn--danger:hover:not(:disabled) {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
 </style>

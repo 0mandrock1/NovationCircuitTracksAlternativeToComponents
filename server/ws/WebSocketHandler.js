@@ -88,6 +88,9 @@ export function setupWebSocket(server) {
     }
   }
 
+  // Broadcast MIDI-out activity to all clients when server sends SysEx
+  midiManager.on('sysexout', () => wss.broadcast({ type: 'midi:out' }))
+
   return wss
 }
 

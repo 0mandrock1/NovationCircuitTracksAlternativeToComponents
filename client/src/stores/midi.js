@@ -10,8 +10,16 @@ function createTemplate(name) {
 export const useMidiStore = defineStore('midi', () => {
   const templates = ref(Array.from({ length: 8 }, (_, i) => createTemplate(`Template ${i + 1}`)))
   const trackRouting = ref([1, 2, 3, 4])
-  const clockIn = ref(false)
+  // Clock Sync
+  const clockIn  = ref(false)
   const clockOut = ref(false)
+  const syncOut  = ref(false)  // 3.5mm sync out
+
+  // DIN / USB port routing
+  const dinMidiIn  = ref(true)
+  const dinMidiOut = ref(true)
+  const usbMidiIn  = ref(true)
+  const usbMidiOut = ref(true)
 
   function setMacroCC(templateIndex, macroIndex, cc) {
     templates.value[templateIndex].macroCC[macroIndex] = cc
@@ -21,5 +29,10 @@ export const useMidiStore = defineStore('midi', () => {
     trackRouting.value[trackIndex] = channel
   }
 
-  return { templates, trackRouting, clockIn, clockOut, setMacroCC, setTrackChannel }
+  return {
+    templates, trackRouting,
+    clockIn, clockOut, syncOut,
+    dinMidiIn, dinMidiOut, usbMidiIn, usbMidiOut,
+    setMacroCC, setTrackChannel,
+  }
 })

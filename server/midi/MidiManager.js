@@ -88,6 +88,7 @@ class MidiManager {
     }
     this.output.send('sysex', bytes)
     this._lastSysExTime = Date.now()
+    this._emit('sysexout', bytes)
   }
 
   /**
