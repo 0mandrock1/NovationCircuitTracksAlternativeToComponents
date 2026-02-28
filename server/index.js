@@ -1,5 +1,7 @@
 import express from 'express'
 import { createServer } from 'http'
+import { fileURLToPath } from 'url'
+import { join, dirname } from 'path'
 import { setupWebSocket } from './ws/WebSocketHandler.js'
 import patchesRouter from './routes/patches.js'
 import samplesRouter from './routes/samples.js'
@@ -9,6 +11,8 @@ import mixerRouter from './routes/mixer.js'
 import transportRouter from './routes/transport.js'
 
 const PORT = process.env.PORT || 3000
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const CLIENT_DIST = join(__dirname, '../client/dist')
 
 const app = express()
 app.use(express.json())
@@ -32,6 +36,12 @@ app.use('/api/transport', transportRouter)
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, version: '1.0.0' })
+})
+
+// Serve built frontend in production
+app.use(express.static(CLIENT_DIST))
+app.get('*', (req, res) => {
+  res.sendFile(join(CLIENT_DIST, 'index.html'))
 })
 
 // Error handler
