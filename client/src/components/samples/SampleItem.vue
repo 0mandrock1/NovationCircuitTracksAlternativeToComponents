@@ -1,15 +1,13 @@
 <script setup>
 import { ref } from 'vue'
 import { useSamplesStore } from '@/stores/samples'
-import { useDeviceStore }  from '@/stores/device'
 
 const props = defineProps({
   sample: { type: Object, required: true },
   index:  { type: Number, required: true }
 })
 
-const store  = useSamplesStore()
-const device = useDeviceStore()
+const store = useSamplesStore()
 
 const renaming = ref(false)
 const newName  = ref('')
@@ -47,19 +45,35 @@ function playPreview() {
   playing.value = true
 }
 
+async function _uploadToServer(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  fetch(`/api/samples/${props.index}/upload`, { method: 'POST', body: formData }).catch(() => {})
+}
+
 function openFilePicker() {
   const input = document.createElement('input')
   input.type   = 'file'
   input.accept = '.wav,.aiff,.aif,.mp3'
   input.onchange = async () => {
-    if (input.files[0]) await store.loadFile(props.index, input.files[0])
+    if (input.files[0]) {
+      await store.loadFile(props.index, input.files[0])
+      _uploadToServer(input.files[0])
+    }
   }
   input.click()
 }
 
 async function onDrop(e) {
   const file = e.dataTransfer.files[0]
-  if (file) await store.loadFile(props.index, file)
+  if (file) {
+    await store.loadFile(props.index, file)
+    _uploadToServer(file)
+  }
+}
+
+function handleSendToDevice() {
+  alert('Отправка сэмплов на устройство через MIDI недоступна.\nИспользуйте SD-карту или Novation Components.')
 }
 
 function deleteSample() {
@@ -116,14 +130,13 @@ function deleteSample() {
         title="Download local copy"
       >↓</button>
 
-      <!-- Send to device (server) -->
+      <!-- Send to device (not available via MIDI) -->
       <button
         class="sample-item__btn sample-item__btn--send"
-        :class="{ 'sample-item__btn--busy': sample.sending }"
-        :disabled="!device.connected || (!sample.buffer && !sample.filename) || sample.sending"
-        @click="store.sendToDevice(index)"
-        title="Send to device (via server)"
-      >{{ sample.sending ? '…' : '→' }}</button>
+        :disabled="!sample.buffer && !sample.filename"
+        @click="handleSendToDevice"
+        title="Send to device (not available via MIDI)"
+      >→</button>
 
       <!-- Delete -->
       <button

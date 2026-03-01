@@ -157,6 +157,10 @@ router.post('/:index/upload', upload.single('file'), async (req, res) => {
   }
 })
 
+router.post('/:index/send', (req, res) => {
+  res.json({ ok: false, message: 'Sample SysEx transfer not implemented. Use SD card or Novation Components.' })
+})
+
 router.delete('/:index', (req, res) => {
   const index = parseInt(req.params.index, 10)
   if (index < 0 || index >= 64) {
