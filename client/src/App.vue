@@ -1,12 +1,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useDeviceStore } from '@/stores/device'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import TabNav    from '@/components/layout/TabNav.vue'
 import StatusBar from '@/components/layout/StatusBar.vue'
-import { useWebSocket } from '@/composables/useWebSocket'
+import { on, off } from '@/composables/useMidi.js'
 
 const router = useRouter()
+const device = useDeviceStore()
 const toast  = ref(null)
 let toastTimer = null
 
@@ -16,12 +18,13 @@ function showToast(message, type = 'info') {
   toastTimer = setTimeout(() => { toast.value = null }, 4000)
 }
 
-// Listen for device connect/disconnect events
-const { on } = useWebSocket()
-on('device:status', (msg) => {
-  if (!msg.connected) showToast('Device disconnected', 'warning')
-  else                showToast(`Connected: ${msg.port}`, 'success')
-})
+function onConnected(portName) {
+  showToast(`Connected: ${portName}`, 'success')
+}
+
+function onDisconnected() {
+  showToast('Device disconnected', 'warning')
+}
 
 // ── Keyboard shortcuts ──────────────────────────────────────────────────────
 const TAB_KEYS = {
@@ -35,7 +38,6 @@ const TAB_KEYS = {
 }
 
 function onKeyDown(e) {
-  // Skip if focus is in an input/textarea/select
   const tag = document.activeElement?.tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
@@ -45,9 +47,19 @@ function onKeyDown(e) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeyDown))
+onMounted(() => {
+  window.addEventListener('keydown', onKeyDown)
+  on('connected',    onConnected)
+  on('disconnected', onDisconnected)
+
+  // Auto-init MIDI on app start (browser may have already granted permission)
+  device.initMidi()
+})
+
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeyDown)
+  off('connected',    onConnected)
+  off('disconnected', onDisconnected)
   clearTimeout(toastTimer)
 })
 </script>

@@ -1,19 +1,46 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { sendSysEx, sendSysExAndWait } from '@/composables/useMidi.js'
+import {
+  buildRequestPatchDump, buildReplaceCurrentPatch, buildWritePatch,
+  buildPatchDumpMessage, buildBankSyx, parseSyxFile, parseSysEx, decodePatchName,
+} from '@/midi/sysex.js'
+import { CMD_PATCH_DUMP, SYNTH_TRACK_1, SYNTH_TRACK_2, SYSEX_MIN_DELAY_MS } from '@/midi/constants.js'
+
+const FETCH_ONE_TIMEOUT_MS = 1000
 
 function _emptySlot(index) {
-  return { index, name: `Patch ${index + 1}`, hasData: false, params: null }
+  return { index, name: `Patch ${index + 1}`, hasData: false, params: null, rawBytes: null }
+}
+
+function _synthTrack(track) {
+  return track === 0 ? SYNTH_TRACK_1 : SYNTH_TRACK_2
+}
+
+function _blobDownload(bytes, filename) {
+  const blob = new Blob([bytes], { type: 'application/octet-stream' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function _emptyProgress() {
+  return { done: 0, total: 64, failed: 0 }
 }
 
 export const usePatchesStore = defineStore('patches', () => {
-  // 0 = Synth 1, 1 = Synth 2
   const activeTrack      = ref(0)
   const activePatchIndex = ref(0)
-  const loading          = ref(false)
   const fetchingAll      = ref(false)
+  const sendingAll       = ref(false)
+  const fetchProgress    = ref(_emptyProgress())
+  const sendProgress     = ref(_emptyProgress())
   const error            = ref(null)
 
-  // patches[track][index]
+  let _cancelFetch = false
+  let _cancelSend  = false
+
   const patches = ref({
     0: Array.from({ length: 64 }, (_, i) => _emptySlot(i)),
     1: Array.from({ length: 64 }, (_, i) => _emptySlot(i)),
@@ -21,123 +48,144 @@ export const usePatchesStore = defineStore('patches', () => {
 
   const activePatch = computed(() => patches.value[activeTrack.value][activePatchIndex.value])
 
-  function _tq() { return `track=${activeTrack.value}` }
+  // ── Fetch from device ────────────────────────────────────────────────────────
 
-  async function fetchPatches() {
-    loading.value = true
-    error.value   = null
+  async function fetchFromDevice(index, timeout = FETCH_ONE_TIMEOUT_MS) {
     try {
-      const res  = await fetch(`/api/patches?${_tq()}`)
-      const data = await res.json()
-      data.patches.forEach(p => { patches.value[activeTrack.value][p.index] = p })
-    } catch (e) {
-      error.value = e.message
-    } finally {
-      loading.value = false
+      const raw    = await sendSysExAndWait(buildRequestPatchDump(index), CMD_PATCH_DUMP, timeout)
+      const parsed = parseSysEx(raw)
+      if (parsed?.type === 'patchDump') {
+        patches.value[activeTrack.value][index] = {
+          index, name: parsed.params.name, hasData: true,
+          params: parsed.params, rawBytes: parsed.rawBytes,
+        }
+        return true
+      }
+      return false
+    } catch {
+      return false
     }
-  }
-
-  async function fetchFromDevice(index) {
-    const res  = await fetch(`/api/patches/${index}/fetch?${_tq()}`, { method: 'POST' })
-    const data = await res.json()
-    if (data.ok) patches.value[activeTrack.value][index] = { ...data.patch, hasData: true }
-    return data
   }
 
   async function fetchAllFromDevice() {
     fetchingAll.value = true
-    error.value       = null
+    _cancelFetch      = false
+    fetchProgress.value = _emptyProgress()
+    fetchProgress.value.total = 64
+    error.value = null
+
     try {
-      const res  = await fetch(`/api/patches/fetch-all?${_tq()}`, { method: 'POST' })
-      const data = await res.json()
-      if (data.ok) await fetchPatches()
-      return data
-    } catch (e) {
-      error.value = e.message
+      for (let i = 0; i < 64; i++) {
+        if (_cancelFetch) break
+        const ok = await fetchFromDevice(i, FETCH_ONE_TIMEOUT_MS)
+        if (!ok) fetchProgress.value.failed++
+        fetchProgress.value.done = i + 1
+        if (i < 63 && !_cancelFetch) await new Promise(r => setTimeout(r, SYSEX_MIN_DELAY_MS))
+      }
     } finally {
       fetchingAll.value = false
     }
   }
 
+  function cancelFetchAll() { _cancelFetch = true }
+
+  // ── Send to device ───────────────────────────────────────────────────────────
+
+  /** Audition (replace current patch, no bank write). */
   async function sendToDevice(index) {
     activePatchIndex.value = index
-    return (await fetch(`/api/patches/${index}/send?${_tq()}`, { method: 'POST' })).json()
+    const slot = patches.value[activeTrack.value][index]
+    if (!slot?.rawBytes) return
+    await sendSysEx(buildReplaceCurrentPatch(slot.rawBytes, _synthTrack(activeTrack.value)))
   }
 
-  async function writePatchToDevice(index) {
-    return (await fetch(`/api/patches/${index}/write?${_tq()}`, { method: 'POST' })).json()
+  /** Write patch to its bank slot on the device. */
+  async function writeToDevice(index) {
+    const slot = patches.value[activeTrack.value][index]
+    if (!slot?.rawBytes) return
+    await sendSysEx(buildWritePatch(slot.rawBytes, index))
   }
+
+  /** Write all patches that have data to the device bank. */
+  async function sendAllToDevice() {
+    sendingAll.value = true
+    _cancelSend      = false
+    sendProgress.value = _emptyProgress()
+    sendProgress.value.total = 64
+    error.value = null
+
+    try {
+      for (let i = 0; i < 64; i++) {
+        if (_cancelSend) break
+        const slot = patches.value[activeTrack.value][i]
+        if (slot?.rawBytes) {
+          try {
+            await sendSysEx(buildWritePatch(slot.rawBytes, i))
+          } catch {
+            sendProgress.value.failed++
+          }
+          await new Promise(r => setTimeout(r, SYSEX_MIN_DELAY_MS))
+        }
+        sendProgress.value.done = i + 1
+      }
+    } finally {
+      sendingAll.value = false
+    }
+  }
+
+  function cancelSendAll() { _cancelSend = true }
+
+  // ── Import / Export ──────────────────────────────────────────────────────────
 
   function exportPatchSyx(index) {
-    const name = patches.value[activeTrack.value][index]?.name ?? `patch_${index}`
-    const a = document.createElement('a')
-    a.href     = `/api/patches/${index}/export?${_tq()}`
-    a.download = `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.syx`
-    a.click()
+    const slot = patches.value[activeTrack.value][index]
+    if (!slot?.rawBytes) return
+    const name  = slot.name ?? `patch_${index}`
+    _blobDownload(
+      new Uint8Array(buildPatchDumpMessage(slot.rawBytes, index)),
+      `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.syx`
+    )
   }
 
   function exportBankSyx() {
-    const a = document.createElement('a')
-    a.href     = `/api/patches/export?${_tq()}`
-    a.download = `circuit_tracks_synth${activeTrack.value + 1}_bank.syx`
-    a.click()
+    _blobDownload(
+      buildBankSyx(patches.value[activeTrack.value].map(p => p.rawBytes)),
+      `circuit_tracks_synth${activeTrack.value + 1}_bank.syx`
+    )
   }
 
   async function importSyx(file) {
-    const buffer = await file.arrayBuffer()
-    const bytes  = new Uint8Array(buffer)
-    // Convert to base64 in chunks to avoid call-stack overflow on large files
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-    const base64 = btoa(binary)
-
-    const res  = await fetch('/api/patches/import', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ data: base64, track: activeTrack.value }),
-    })
-    const data = await res.json()
-    if (data.ok) await fetchPatches()
-    return data
+    error.value = null
+    try {
+      const parsed = parseSyxFile(new Uint8Array(await file.arrayBuffer()))
+      if (!parsed.length) { error.value = 'No valid patches found in file'; return { ok: false } }
+      for (const { patchIndex, rawBytes } of parsed) {
+        patches.value[activeTrack.value][patchIndex] = {
+          index: patchIndex, name: decodePatchName(rawBytes), hasData: true, params: null, rawBytes,
+        }
+      }
+      return { ok: true, count: parsed.length }
+    } catch (e) {
+      error.value = e.message
+      return { ok: false }
+    }
   }
 
-  async function renamePatch(index, name) {
-    const res  = await fetch(`/api/patches/${index}?${_tq()}`, {
-      method:  'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name }),
-    })
-    const data = await res.json()
-    if (data.ok) patches.value[activeTrack.value][index].name = data.name
-    return data
+  function renamePatch(index, name) {
+    const slot = patches.value[activeTrack.value][index]
+    if (slot) slot.name = name
   }
 
-  async function deletePatch(index) {
-    await fetch(`/api/patches/${index}?${_tq()}`, { method: 'DELETE' })
+  function deletePatch(index) {
     patches.value[activeTrack.value][index] = _emptySlot(index)
-  }
-
-  // Called by WebSocket handler
-  function handleWsPatchUpdate(msg) {
-    if (patches.value[msg.track]?.[msg.index]) {
-      Object.assign(patches.value[msg.track][msg.index], { name: msg.name, params: msg.params, hasData: true })
-    }
-  }
-
-  function handleWsCurrentDump(msg) {
-    if (msg.params) {
-      const slot = patches.value[activeTrack.value][activePatchIndex.value]
-      Object.assign(slot, { params: msg.params, hasData: true })
-    }
   }
 
   return {
     patches, activeTrack, activePatchIndex, activePatch,
-    loading, fetchingAll, error,
-    fetchPatches, fetchFromDevice, fetchAllFromDevice,
-    sendToDevice, writePatchToDevice,
+    fetchingAll, sendingAll, fetchProgress, sendProgress, error,
+    fetchFromDevice, fetchAllFromDevice, cancelFetchAll,
+    sendToDevice, writeToDevice, sendAllToDevice, cancelSendAll,
     exportPatchSyx, exportBankSyx, importSyx,
     renamePatch, deletePatch,
-    handleWsPatchUpdate, handleWsCurrentDump,
   }
 })

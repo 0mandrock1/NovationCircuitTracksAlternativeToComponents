@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { ref, computed } from 'vue'
 import { usePatchesStore } from '@/stores/patches'
 import { useDeviceStore }  from '@/stores/device'
 import PatchList      from '@/components/patches/PatchList.vue'
@@ -20,7 +20,9 @@ const SUB_TABS = [
   { id: 'mod',    label: 'Modulation' },
 ]
 
-onMounted(() => store.fetchPatches())
+const activeProgress = computed(() =>
+  store.fetchingAll ? store.fetchProgress : store.sendProgress
+)
 </script>
 
 <template>
@@ -62,24 +64,65 @@ onMounted(() => store.fetchPatches())
             :key="idx"
             class="track-btn"
             :class="{ 'track-btn--active': store.activeTrack === idx }"
-            @click="store.activeTrack = idx; store.fetchPatches()"
+            @click="store.activeTrack = idx"
           >{{ label }}</button>
         </div>
 
         <div class="patches-view__actions">
-          <button
-            class="btn btn--sm"
-            :disabled="!device.connected || store.fetchingAll"
-            @click="store.fetchAllFromDevice()"
-            :title="device.connected ? 'Download all patches from device' : 'Connect device first'"
-          >{{ store.fetchingAll ? 'Fetching…' : '↓ Fetch All' }}</button>
-          <button class="btn btn--sm" @click="store.exportBankSyx()" title="Export all 64 patches as .syx">↑ Export Bank</button>
-          <label class="btn btn--sm" title="Import .syx file (single patch or bank)">
-            ↓ Import .syx
+          <!-- Fetch all -->
+          <template v-if="!store.fetchingAll">
+            <button
+              class="btn btn--sm"
+              :disabled="!device.connected || store.sendingAll"
+              @click="store.fetchAllFromDevice()"
+              :title="device.connected ? 'Download all patches from device' : 'Connect device first'"
+            >↓ Fetch All</button>
+          </template>
+          <template v-else>
+            <button class="btn btn--sm btn--active" disabled>
+              ↓ {{ store.fetchProgress.done }}/64
+            </button>
+            <button class="btn btn--sm" @click="store.cancelFetchAll()">✕</button>
+          </template>
+
+          <!-- Send all -->
+          <template v-if="!store.sendingAll">
+            <button
+              class="btn btn--sm"
+              :disabled="!device.connected || store.fetchingAll"
+              @click="store.sendAllToDevice()"
+              :title="device.connected ? 'Write all loaded patches to device bank' : 'Connect device first'"
+            >↑ Send All</button>
+          </template>
+          <template v-else>
+            <button class="btn btn--sm btn--active" disabled>
+              ↑ {{ store.sendProgress.done }}/64
+            </button>
+            <button class="btn btn--sm" @click="store.cancelSendAll()">✕</button>
+          </template>
+
+          <button class="btn btn--sm" @click="store.exportBankSyx()" title="Export bank as .syx">Export .syx</button>
+          <label class="btn btn--sm" title="Import .syx file">
+            Import .syx
             <input type="file" accept=".syx" style="display:none"
               @change="e => e.target.files[0] && store.importSyx(e.target.files[0])" />
           </label>
         </div>
+      </div>
+
+      <!-- Progress bar (fetch or send) -->
+      <div v-if="store.fetchingAll || store.sendingAll" class="patches-view__progress">
+        <div
+          class="patches-view__progress-fill"
+          :style="{ width: (activeProgress.done / activeProgress.total * 100) + '%' }"
+        />
+        <span class="patches-view__progress-label">
+          {{ store.fetchingAll ? '↓ Fetch' : '↑ Send' }}
+          {{ activeProgress.done }} / {{ activeProgress.total }}
+          <span v-if="activeProgress.failed > 0" class="patches-view__progress-failed">
+            ({{ activeProgress.failed }} failed)
+          </span>
+        </span>
       </div>
 
       <!-- Sub-tab navigation -->
@@ -254,6 +297,38 @@ onMounted(() => store.fetchPatches())
 }
 .btn:hover:not(:disabled) { border-color: var(--color-text-muted); }
 .btn:disabled { opacity: 0.4; cursor: default; }
+.btn--active { background: var(--color-accent); border-color: var(--color-accent); color: #fff; opacity: 1; }
+
+.patches-view__progress {
+  position: relative;
+  height: 18px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.patches-view__progress-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: var(--color-accent);
+  opacity: 0.35;
+  transition: width 0.15s ease;
+}
+
+.patches-view__progress-label {
+  position: relative;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  padding: 0 8px;
+  z-index: 1;
+}
+
+.patches-view__progress-failed { color: var(--color-warning); }
 
 .patches-view__subtabs {
   display: flex;

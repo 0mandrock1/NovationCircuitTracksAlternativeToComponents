@@ -81,7 +81,7 @@ function cancelRename() {
             class="patch-list__btn"
             :disabled="!device.connected || !patch.hasData"
             :title="device.connected ? 'Write to device bank slot' : 'Connect device first'"
-            @click="store.writePatchToDevice(patch.index)"
+            @click="store.writeToDevice(patch.index)"
           >✦</button>
 
           <!-- Export .syx -->

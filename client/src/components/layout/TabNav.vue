@@ -11,7 +11,8 @@ const tabs = [
   { label: 'Mixer', path: '/mixer' },
   { label: 'MIDI', path: '/midi' },
   { label: 'Sessions', path: '/sessions' },
-  { label: 'Device', path: '/device' }
+  { label: 'Device', path: '/device' },
+  { label: 'MIDI Ref', path: '/midi-ref' }
 ]
 </script>
 

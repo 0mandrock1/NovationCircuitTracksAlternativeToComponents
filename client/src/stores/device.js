@@ -1,53 +1,69 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { requestAccess, getPorts, connect as midiConnect, disconnect as midiDisconnect, forgetDevice, isConnected, on } from '@/composables/useMidi.js'
+
+const WATCHDOG_INTERVAL_MS = 2000
 
 export const useDeviceStore = defineStore('device', () => {
-  const connected = ref(false)
-  const portName = ref('')
+  const connected       = ref(false)
+  const portName        = ref('')
   const firmwareVersion = ref('')
-  const availablePorts = ref([])
-  const lastActivity = ref(null)
+  const availablePorts  = ref([])
+  const lastActivity    = ref(null)
+  const midiInitialized = ref(false)
+  const midiSupported   = ref(!!navigator.requestMIDIAccess)
+
+  let watchdogTimer = null
 
   const statusText = computed(() => {
     if (connected.value) return `Connected: ${portName.value}`
     return 'Disconnected'
   })
 
-  async function fetchPorts() {
-    const res = await fetch('/api/device/ports')
-    const data = await res.json()
-    availablePorts.value = data.ports
+  async function initMidi() {
+    if (midiInitialized.value) return true
+    const ok = await requestAccess()
+    if (!ok) return false
+    midiInitialized.value = true
+
+    on('connected',   (name) => { connected.value = true;  portName.value = name })
+    on('disconnected', ()    => { connected.value = false; portName.value = '' })
+    on('portschange',  ()    => { availablePorts.value = getPorts() })
+
+    availablePorts.value = getPorts()
+    _startWatchdog()
+    return true
+  }
+
+  function _startWatchdog() {
+    if (watchdogTimer) return
+    watchdogTimer = setInterval(() => {
+      availablePorts.value = getPorts()
+      if (connected.value && !isConnected()) {
+        connected.value = false
+        portName.value  = ''
+      }
+    }, WATCHDOG_INTERVAL_MS)
+  }
+
+  function fetchPorts() {
+    availablePorts.value = getPorts()
   }
 
   async function connect(port) {
-    const res = await fetch('/api/device/connect', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ port })
-    })
-    const data = await res.json()
-    if (data.ok) {
+    const ok = await midiConnect(port)
+    if (ok) {
       connected.value = true
-      portName.value = port
+      portName.value  = port
     }
-    return data
+    return ok
   }
 
-  async function disconnect() {
-    await fetch('/api/device/disconnect', { method: 'POST' })
-    connected.value = false
-    portName.value = ''
+  function disconnect() {
+    forgetDevice()
+    connected.value       = false
+    portName.value        = ''
     firmwareVersion.value = ''
-  }
-
-  function setConnected(port) {
-    connected.value = true
-    portName.value = port
-  }
-
-  function setDisconnected() {
-    connected.value = false
-    portName.value = ''
   }
 
   function recordActivity() {
@@ -55,17 +71,9 @@ export const useDeviceStore = defineStore('device', () => {
   }
 
   return {
-    connected,
-    portName,
-    firmwareVersion,
-    availablePorts,
-    lastActivity,
+    connected, portName, firmwareVersion, availablePorts, lastActivity,
+    midiInitialized, midiSupported,
     statusText,
-    fetchPorts,
-    connect,
-    disconnect,
-    setConnected,
-    setDisconnected,
-    recordActivity
+    initMidi, fetchPorts, connect, disconnect, recordActivity,
   }
 })

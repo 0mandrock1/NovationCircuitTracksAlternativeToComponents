@@ -18,7 +18,7 @@ const store = useMixerStore()
     </div>
 
     <div class="mixer-view__macros">
-      <div class="mixer-view__macros-title">Macro Knobs</div>
+      <div class="mixer-view__macros-title">Macro Knobs · Synth 1 (CC 80–87 / Ch 1)</div>
       <div class="mixer-view__macros-row">
         <div
           v-for="(val, i) in store.macros"

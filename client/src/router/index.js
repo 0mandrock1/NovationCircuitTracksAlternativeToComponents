@@ -8,7 +8,8 @@ const routes = [
   { path: '/mixer', component: () => import('@/views/MixerView.vue') },
   { path: '/midi', component: () => import('@/views/MidiView.vue') },
   { path: '/sessions', component: () => import('@/views/SessionsView.vue') },
-  { path: '/device', component: () => import('@/views/DeviceView.vue') }
+  { path: '/device', component: () => import('@/views/DeviceView.vue') },
+  { path: '/midi-ref', component: () => import('@/views/MidiRefView.vue') }
 ]
 
 const router = createRouter({

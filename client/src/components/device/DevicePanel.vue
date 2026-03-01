@@ -8,43 +8,39 @@ const tempo       = ref(120)
 const swing       = ref(0)
 const transpose   = ref(0)
 const applyStatus = ref('')
+const initError   = ref('')
 
 onMounted(() => {
-  device.fetchPorts()
+  if (device.midiInitialized) device.fetchPorts()
 })
 
-async function handleConnect(port) {
-  await device.connect(port)
+async function handleEnableMidi() {
+  initError.value = ''
+  const ok = await device.initMidi()
+  if (!ok) initError.value = 'MIDI access denied or not supported in this browser.'
 }
 
-async function handleDisconnect() {
-  await device.disconnect()
+function handleConnect(port) {
+  device.connect(port)
 }
 
+function handleDisconnect() {
+  device.disconnect()
+}
+
+// Global settings are sent via SysEx — placeholder until SysEx commands are specified
 async function applyTempo() {
-  await postSetting('tempo', { bpm: tempo.value })
+  applyStatus.value = 'Tempo: not yet implemented'
+  setTimeout(() => { applyStatus.value = '' }, 2000)
 }
 
 async function applySwing() {
-  await postSetting('swing', { amount: swing.value })
+  applyStatus.value = 'Swing: not yet implemented'
+  setTimeout(() => { applyStatus.value = '' }, 2000)
 }
 
 async function applyTranspose() {
-  await postSetting('transpose', { semitones: transpose.value })
-}
-
-async function postSetting(endpoint, body) {
-  try {
-    const res  = await fetch(`/api/device/${endpoint}`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
-    })
-    const data = await res.json()
-    applyStatus.value = data.ok ? 'Sent ✓' : (data.error ?? 'Error')
-  } catch {
-    applyStatus.value = 'No device'
-  }
+  applyStatus.value = 'Transpose: not yet implemented'
   setTimeout(() => { applyStatus.value = '' }, 2000)
 }
 </script>
@@ -52,6 +48,20 @@ async function postSetting(endpoint, body) {
 <template>
   <div class="device-panel">
     <h2 class="device-panel__title">Device</h2>
+
+    <!-- Enable MIDI (first time) -->
+    <section v-if="!device.midiInitialized" class="device-panel__section">
+      <h3 class="device-panel__section-title">Web MIDI Access</h3>
+      <p class="device-panel__no-ports">
+        Click the button below to allow the browser to access MIDI devices.
+        Chrome will show a permission dialog.
+      </p>
+      <button class="btn btn--primary" @click="handleEnableMidi">Enable MIDI</button>
+      <div v-if="initError" class="gs-status gs-status--error">{{ initError }}</div>
+      <div v-if="!device.midiSupported" class="gs-status gs-status--error">
+        Web MIDI API is not supported in this browser. Use Chrome or Edge.
+      </div>
+    </section>
 
     <!-- Connection status -->
     <section class="device-panel__section">
@@ -67,7 +77,7 @@ async function postSetting(endpoint, body) {
     </section>
 
     <!-- MIDI port list -->
-    <section class="device-panel__section">
+    <section v-if="device.midiInitialized" class="device-panel__section">
       <h3 class="device-panel__section-title">MIDI Port</h3>
       <div v-if="device.availablePorts.length === 0" class="device-panel__no-ports">
         No MIDI ports found. Make sure Circuit Tracks is connected via USB.
@@ -302,6 +312,8 @@ async function postSetting(endpoint, body) {
   font-family: var(--font-mono);
   padding-top: var(--spacing-xs);
 }
+
+.gs-status--error { color: var(--color-error); }
 
 /* ── Firmware ────────────────────────────────────────────────────────────────── */
 .fw-update {

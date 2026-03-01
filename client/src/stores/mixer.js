@@ -1,42 +1,100 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { sendCC, on } from '@/composables/useMidi.js'
 
-// MIDI channel mapping (0-indexed): mixer channel index → MIDI channel number
-// Synth 1 = ch 0, Synth 2 = ch 1, MIDI 1-4 = ch 2-5, Drum = ch 9
-const MIDI_CHANNELS = [0, 1, 2, 3, 4, 5, 9, 9]
+// Source: Circuit Tracks Programmer's Reference Guide v3
+//
+// MIDI channel map (0-indexed):
+//   Synth 1 → Ch 1 (idx 0)   Synth 2 → Ch 2 (idx 1)
+//   Drum 1  → Ch 6 (idx 5)   Drum 2  → Ch 7 (idx 6)
+//   Drum 3  → Ch 8 (idx 7)   Drum 4  → Ch 9 (idx 8)
+//   Session → Ch 16 (idx 15)  — global mixer volumes
+//
+// Session Control CCs on Ch 16:
+//   CC 7  = Synth 1 Volume    CC 8  = Synth 2 Volume
+//   CC 9  = Drum 1 Volume     CC 10 = Drum 2 Volume
+//   CC 11 = Drum 3 Volume     CC 12 = Drum 4 Volume
+//
+// Per-channel CCs (synth Ch1/2, drum Ch6–9):
+//   CC 7  = Level   CC 10 = Pan
+//   CC 91 = Distortion Level   CC 93 = Chorus Level
+//
+// Macro knob positions (Ch 1 for Synth1, Ch 2 for Synth2):
+//   CC 80–87 = Macro 1–8
 
-// Default CC numbers for 8 macro knobs (on channel 0 = Synth 1)
-const MACRO_CC_NUMS = [1, 2, 5, 11, 12, 13, 71, 74]
+const SESSION_CH = 15  // 0-indexed Ch 16
 
-function createChannel(name) {
-  return { name, volume: 100, pan: 0, muted: false, soloed: false, reverbSend: 0, delaySend: 0 }
-}
+// Per track: { name, midiCh (0-idx, null = MIDI passthrough), sessionVolCC }
+const TRACK_DEFS = [
+  { name: 'Synth 1', midiCh: 0,    sessionVolCC: 7  },
+  { name: 'Synth 2', midiCh: 1,    sessionVolCC: 8  },
+  { name: 'MIDI 1',  midiCh: null,  sessionVolCC: null },
+  { name: 'MIDI 2',  midiCh: null,  sessionVolCC: null },
+  { name: 'MIDI 3',  midiCh: null,  sessionVolCC: null },
+  { name: 'MIDI 4',  midiCh: null,  sessionVolCC: null },
+  { name: 'Drum 1',  midiCh: 5,    sessionVolCC: 9  },
+  { name: 'Drum 2',  midiCh: 6,    sessionVolCC: 10 },
+  { name: 'Drum 3',  midiCh: 7,    sessionVolCC: 11 },
+  { name: 'Drum 4',  midiCh: 8,    sessionVolCC: 12 },
+]
 
-const CHANNEL_NAMES = ['Synth 1', 'Synth 2', 'MIDI 1', 'MIDI 2', 'MIDI 3', 'MIDI 4', 'Drum 1', 'Drum 2']
+const MACRO_CC_BASE = 80  // CC 80–87 = Macro 1–8
 
-async function _postCC(channel, controller, value) {
-  try {
-    await fetch('/api/mixer/cc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel, controller, value }),
-    })
-  } catch { /* no device connected — ignore */ }
+function createChannel(def) {
+  return {
+    name:        def.name,
+    midiCh:      def.midiCh,
+    sessionVolCC: def.sessionVolCC,
+    volume:      100,
+    pan:         64,   // 0–127, centre = 64
+    distortion:  0,
+    chorus:      0,
+    muted:       false,
+    soloed:      false,
+  }
 }
 
 export const useMixerStore = defineStore('mixer', () => {
-  const channels = ref(CHANNEL_NAMES.map(createChannel))
-  const macros = ref(Array(8).fill(0))
+  const channels = ref(TRACK_DEFS.map(createChannel))
+  const macros   = ref(Array(8).fill(0))
+
+  // ── Outgoing CC ────────────────────────────────────────────────────────────
 
   function setVolume(index, value) {
     channels.value[index].volume = value
-    _postCC(MIDI_CHANNELS[index], 7, value)
+    const ch = channels.value[index]
+    if (ch.sessionVolCC !== null) {
+      // Session Control: global volume on Ch 16
+      sendCC(SESSION_CH, ch.sessionVolCC, value)
+    }
+    if (ch.midiCh !== null) {
+      // Also send on own channel (redundant but some MIDI devices expect it)
+      sendCC(ch.midiCh, 7, value)
+    }
   }
 
   function setPan(index, value) {
     channels.value[index].pan = value
-    // pan: -63..63 → MIDI CC 1..127 (center 0 → CC 64)
-    _postCC(MIDI_CHANNELS[index], 10, value + 64)
+    const ch = channels.value[index]
+    if (ch.midiCh !== null) {
+      sendCC(ch.midiCh, 10, value)
+    }
+  }
+
+  function setDistortion(index, value) {
+    channels.value[index].distortion = value
+    const ch = channels.value[index]
+    if (ch.midiCh !== null) {
+      sendCC(ch.midiCh, 91, value)
+    }
+  }
+
+  function setChorus(index, value) {
+    channels.value[index].chorus = value
+    const ch = channels.value[index]
+    if (ch.midiCh !== null) {
+      sendCC(ch.midiCh, 93, value)
+    }
   }
 
   function toggleMute(index) {
@@ -47,41 +105,42 @@ export const useMixerStore = defineStore('mixer', () => {
     channels.value[index].soloed = !channels.value[index].soloed
   }
 
-  function setReverbSend(index, value) {
-    channels.value[index].reverbSend = value
-    _postCC(MIDI_CHANNELS[index], 91, value)
-  }
+  // ── Incoming CC from device ────────────────────────────────────────────────
 
-  function setDelaySend(index, value) {
-    channels.value[index].delaySend = value
-    _postCC(MIDI_CHANNELS[index], 95, value)
-  }
+  function applyIncomingCC(midiCh, controller, value) {
+    // Session Control — volumes
+    if (midiCh === SESSION_CH) {
+      const track = channels.value.find(ch => ch.sessionVolCC === controller)
+      if (track) track.volume = value
+      return
+    }
 
-  function updateMacro(index, value) {
-    macros.value[index] = value
-  }
-
-  // Apply incoming CC from device — updates state only, no re-send to avoid feedback loops
-  function applyIncomingCC(channel, controller, value) {
-    // Macro knobs arrive on channel 0 (Synth 1)
-    if (channel === 0) {
-      const macroIdx = MACRO_CC_NUMS.indexOf(controller)
-      if (macroIdx !== -1) {
+    // Macro knobs on synth channels (CC 80–87)
+    if (midiCh === 0 || midiCh === 1) {
+      const macroIdx = controller - MACRO_CC_BASE
+      if (macroIdx >= 0 && macroIdx <= 7) {
         macros.value[macroIdx] = value
         return
       }
     }
-    const trackIdx = MIDI_CHANNELS.indexOf(channel)
-    if (trackIdx === -1) return
-    if (controller === 7)  channels.value[trackIdx].volume     = value
-    if (controller === 10) channels.value[trackIdx].pan        = value - 64
-    if (controller === 91) channels.value[trackIdx].reverbSend = value
-    if (controller === 95) channels.value[trackIdx].delaySend  = value
+
+    // Per-channel controls
+    const track = channels.value.find(ch => ch.midiCh === midiCh)
+    if (!track) return
+    if (controller === 7)  track.volume     = value
+    if (controller === 10) track.pan        = value
+    if (controller === 91) track.distortion = value
+    if (controller === 93) track.chorus     = value
   }
+
+  on('cc', ({ channel, controller, value }) => {
+    applyIncomingCC(channel, controller, value)
+  })
 
   return {
     channels, macros,
-    setVolume, setPan, toggleMute, toggleSolo,
-    setReverbSend, setDelaySend, updateMacro, applyIncomingCC,
+    setVolume, setPan, setDistortion, setChorus,
+    toggleMute, toggleSolo,
+    applyIncomingCC,
   }
 })

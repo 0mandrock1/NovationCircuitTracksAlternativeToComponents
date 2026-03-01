@@ -1,9 +1,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useDeviceStore } from '@/stores/device'
-import { useWebSocket }   from '@/composables/useWebSocket'
+import { on, off } from '@/composables/useMidi.js'
 
-const device = useDeviceStore()
+const device  = useDeviceStore()
 const midiIn  = ref(false)
 const midiOut = ref(false)
 let inTimer  = null
@@ -21,14 +21,22 @@ function flashOut() {
   outTimer = setTimeout(() => { midiOut.value = false }, 80)
 }
 
-const { on } = useWebSocket()
-on('midi:cc',      flashIn)
-on('midi:noteon',  flashIn)
-on('midi:noteoff', flashIn)
-on('midi:sysex',   flashIn)
-on('midi:out',     flashOut)
+onMounted(() => {
+  on('cc',      flashIn)
+  on('noteon',  flashIn)
+  on('noteoff', flashIn)
+  on('sysex',   flashIn)
+  on('sysexout', flashOut)
+  on('ccout',    flashOut)
+})
 
 onUnmounted(() => {
+  off('cc',      flashIn)
+  off('noteon',  flashIn)
+  off('noteoff', flashIn)
+  off('sysex',   flashIn)
+  off('sysexout', flashOut)
+  off('ccout',    flashOut)
   clearTimeout(inTimer)
   clearTimeout(outTimer)
 })

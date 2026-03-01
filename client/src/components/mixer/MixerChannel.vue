@@ -10,8 +10,8 @@ const props = defineProps({
 const store = useMixerStore()
 
 function panLabel(val) {
-  if (val === 0) return 'C'
-  return val < 0 ? `L${Math.abs(val)}` : `R${val}`
+  if (val === 64) return 'C'
+  return val < 64 ? `L${64 - val}` : `R${val - 64}`
 }
 </script>
 
@@ -33,10 +33,10 @@ function panLabel(val) {
       <input
         type="range"
         class="mixer-channel__pan"
-        min="-63" max="63"
+        min="0" max="127"
         :value="channel.pan"
         @input="store.setPan(index, Number($event.target.value))"
-        title="Pan"
+        title="Pan (64=Centre)"
       />
       <span class="mixer-channel__pan-label">{{ panLabel(channel.pan) }}</span>
     </div>
