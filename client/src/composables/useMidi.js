@@ -33,6 +33,10 @@ function onMidiMessage(ev) {
   const channel = status & 0x0F
 
   if (status === 0xF0) {
+    if (import.meta.env.DEV) {
+      const hex = data.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ')
+      console.log(`[MIDI SysEx IN] cmd=0x${data[6]?.toString(16).padStart(2,'0').toUpperCase() ?? '??'} len=${data.length} ${hex}`)
+    }
     emit('sysex', data)
     if (data.length > 6) {
       const cmd = data[6]
@@ -148,7 +152,10 @@ export function getPortName() { return _portName }
 export function isConnected() { return !!outputPort && outputPort.state !== 'disconnected' }
 
 export function sendCC(channel, controller, value) {
-  if (!outputPort) return
+  if (!outputPort) {
+    if (import.meta.env.DEV) console.warn(`[MIDI] sendCC dropped (port not open): Ch${channel + 1} CC${controller}=${value}`)
+    return
+  }
   try {
     outputPort.send([0xB0 | (channel & 0x0F), controller & 0x7F, value & 0x7F])
     emit('ccout', { channel, controller, value })

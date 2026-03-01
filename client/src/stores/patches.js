@@ -2,12 +2,12 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { sendSysEx, sendSysExAndWait } from '@/composables/useMidi.js'
 import {
-  buildRequestPatchDump, buildReplaceCurrentPatch, buildWritePatch,
+  buildRequestPatchDump, buildRequestCurrentPatch, buildReplaceCurrentPatch, buildWritePatch,
   buildPatchDumpMessage, buildBankSyx, parseSyxFile, parseSysEx, decodePatchName,
 } from '@/midi/sysex.js'
-import { CMD_PATCH_DUMP, SYNTH_TRACK_1, SYNTH_TRACK_2, SYSEX_MIN_DELAY_MS } from '@/midi/constants.js'
+import { CMD_PATCH_DUMP, CMD_CURRENT_PATCH_DUMP, SYNTH_TRACK_1, SYNTH_TRACK_2, SYSEX_MIN_DELAY_MS } from '@/midi/constants.js'
 
-const FETCH_ONE_TIMEOUT_MS = 1000
+const FETCH_ONE_TIMEOUT_MS = 3000
 
 function _emptySlot(index) {
   return { index, name: `Patch ${index + 1}`, hasData: false, params: null, rawBytes: null }
@@ -88,6 +88,29 @@ export const usePatchesStore = defineStore('patches', () => {
   }
 
   function cancelFetchAll() { _cancelFetch = true }
+
+  /** Fetch whatever patch is currently active on the device (alternative to indexed fetch). */
+  async function fetchCurrentPatch() {
+    try {
+      const raw    = await sendSysExAndWait(
+        buildRequestCurrentPatch(_synthTrack(activeTrack.value)),
+        CMD_CURRENT_PATCH_DUMP,
+        FETCH_ONE_TIMEOUT_MS
+      )
+      const parsed = parseSysEx(raw)
+      if (parsed?.type === 'currentPatchDump') {
+        const index = activePatchIndex.value
+        patches.value[activeTrack.value][index] = {
+          index, name: parsed.params.name, hasData: true,
+          params: parsed.params, rawBytes: parsed.rawBytes,
+        }
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
+  }
 
   // ── Send to device ───────────────────────────────────────────────────────────
 
@@ -183,7 +206,7 @@ export const usePatchesStore = defineStore('patches', () => {
   return {
     patches, activeTrack, activePatchIndex, activePatch,
     fetchingAll, sendingAll, fetchProgress, sendProgress, error,
-    fetchFromDevice, fetchAllFromDevice, cancelFetchAll,
+    fetchFromDevice, fetchAllFromDevice, cancelFetchAll, fetchCurrentPatch,
     sendToDevice, writeToDevice, sendAllToDevice, cancelSendAll,
     exportPatchSyx, exportBankSyx, importSyx,
     renamePatch, deletePatch,
