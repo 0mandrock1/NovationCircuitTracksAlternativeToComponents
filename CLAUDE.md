@@ -522,6 +522,14 @@ npm run build
 
 ---
 
+## MIDI Cheatsheet
+
+При работе с CC-номерами, SysEx-командами, структурой патчей и параметрами устройства —
+**всегда смотреть в `circuit-tracks-midi-cheatsheet.html`** (корень проекта, продублирован в `client/public/`).
+Там сведены все актуальные константы Circuit Tracks.
+
+---
+
 ## Полезные ссылки
 
 - [Circuit Tracks Programmer's Reference v3](https://fael-downloads-prod.focusrite.com/customer/prod/downloads/circuit_tracks_programmer_s_reference_guide_v3.pdf) — SysEx спецификация
