@@ -1,14 +1,30 @@
 <script setup>
+import { computed } from 'vue'
 import { useSequencerStore } from '@/stores/sequencer'
 import StepCell from './StepCell.vue'
 
 const props = defineProps({
-  track: { type: Object, required: true },
+  track:      { type: Object, required: true },
   trackIndex: { type: Number, required: true },
-  stepCount: { type: Number, default: 16 }
+  stepCount:  { type: Number, default: 16 }
 })
 
 const store = useSequencerStore()
+
+const TRACK_COLORS = [
+  'var(--color-synth1)',
+  'var(--color-synth2)',
+  'var(--color-midi1)',
+  'var(--color-midi2)',
+  'var(--color-midi3)',
+  'var(--color-midi4)',
+  'var(--color-drum1)',
+  'var(--color-drum2)',
+  'var(--color-drum3)',
+  'var(--color-drum4)',
+]
+
+const trackColor = computed(() => TRACK_COLORS[props.trackIndex] ?? 'var(--color-accent)')
 </script>
 
 <template>
@@ -32,6 +48,7 @@ const store = useSequencerStore()
         :step-index="stepIndex - 1"
         :track-index="trackIndex"
         :is-playing="store.playingStep === stepIndex - 1"
+        :track-color="trackColor"
       />
     </div>
   </div>

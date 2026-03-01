@@ -1,8 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useDeviceStore } from '@/stores/device'
+import { useToast } from '@/composables/useToast'
 
 const device = useDeviceStore()
+const { toast } = useToast()
 
 const tempo       = ref(120)
 const swing       = ref(0)
@@ -150,7 +152,6 @@ async function applyTranspose() {
         <button class="btn btn--sm btn--secondary" @click="applyTranspose">Apply</button>
       </div>
 
-      <div v-if="applyStatus" class="gs-status">{{ applyStatus }}</div>
     </section>
 
     <!-- Firmware -->
@@ -314,6 +315,7 @@ async function applyTranspose() {
 }
 
 .gs-status--error { color: var(--color-error); }
+
 
 /* ── Firmware ────────────────────────────────────────────────────────────────── */
 .fw-update {

@@ -1,67 +1,26 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useDeviceStore } from '@/stores/device'
-import AppHeader from '@/components/layout/AppHeader.vue'
-import TabNav    from '@/components/layout/TabNav.vue'
-import StatusBar from '@/components/layout/StatusBar.vue'
-import { on, off } from '@/composables/useMidi.js'
+import { ref } from 'vue'
+import AppHeader      from '@/components/layout/AppHeader.vue'
+import TabNav         from '@/components/layout/TabNav.vue'
+import StatusBar      from '@/components/layout/StatusBar.vue'
+import ToastContainer from '@/components/ui/ToastContainer.vue'
+import ShortcutsModal from '@/components/ui/ShortcutsModal.vue'
+import { useWebSocket } from '@/composables/useWebSocket'
+import { useToast }     from '@/composables/useToast'
+import { useKeyboard }  from '@/composables/useKeyboard'
 
-const router = useRouter()
-const device = useDeviceStore()
-const toast  = ref(null)
-let toastTimer = null
+const { toast } = useToast()
 
-function showToast(message, type = 'info') {
-  toast.value = { message, type }
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = null }, 4000)
-}
-
-function onConnected(portName) {
-  showToast(`Connected: ${portName}`, 'success')
-}
-
-function onDisconnected() {
-  showToast('Device disconnected', 'warning')
-}
-
-// ── Keyboard shortcuts ──────────────────────────────────────────────────────
-const TAB_KEYS = {
-  '1': '/patches',
-  '2': '/samples',
-  '3': '/sequencer',
-  '4': '/mixer',
-  '5': '/midi',
-  '6': '/sessions',
-  '7': '/device',
-}
-
-function onKeyDown(e) {
-  const tag = document.activeElement?.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-
-  const route = TAB_KEYS[e.key]
-  if (route && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    router.push(route)
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('keydown', onKeyDown)
-  on('connected',    onConnected)
-  on('disconnected', onDisconnected)
-
-  // Auto-init MIDI on app start (browser may have already granted permission)
-  device.initMidi()
+// Listen for device connect/disconnect events
+const { on } = useWebSocket()
+on('device:status', (msg) => {
+  if (!msg.connected) toast('Device disconnected', { type: 'warning' })
+  else                toast(`Connected: ${msg.port}`, { type: 'success' })
 })
 
-onUnmounted(() => {
-  window.removeEventListener('keydown', onKeyDown)
-  off('connected',    onConnected)
-  off('disconnected', onDisconnected)
-  clearTimeout(toastTimer)
-})
+// Shortcuts modal
+const showShortcuts = ref(false)
+useKeyboard(() => { showShortcuts.value = !showShortcuts.value })
 </script>
 
 <template>
@@ -72,14 +31,8 @@ onUnmounted(() => {
       <RouterView />
     </main>
     <StatusBar />
-
-    <!-- Toast notifications -->
-    <Transition name="toast">
-      <div v-if="toast" class="toast" :class="`toast--${toast.type}`">
-        {{ toast.message }}
-        <button class="toast__close" @click="toast = null">✕</button>
-      </div>
-    </Transition>
+    <ToastContainer />
+    <ShortcutsModal :show="showShortcuts" @close="showShortcuts = false" />
   </div>
 </template>
 
@@ -103,43 +56,4 @@ onUnmounted(() => {
     padding: var(--spacing-sm);
   }
 }
-
-/* ── Toast ──────────────────────────────────────────────────────────────── */
-.toast {
-  position: fixed;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
-  font-size: 0.82rem;
-  font-weight: 500;
-  z-index: 9999;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-  max-width: 400px;
-}
-
-.toast--info    { background: var(--color-surface-3); border: 1px solid var(--color-border); color: var(--color-text); }
-.toast--success { background: #1a3028; border: 1px solid var(--color-success); color: var(--color-success); }
-.toast--warning { background: #32280a; border: 1px solid var(--color-warning); color: var(--color-warning); }
-.toast--error   { background: #2a1414; border: 1px solid var(--color-error);   color: var(--color-error);   }
-
-.toast__close {
-  background: transparent;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  font-size: 0.7rem;
-  opacity: 0.7;
-  padding: 0;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.toast__close:hover { opacity: 1; }
-
-.toast-enter-active, .toast-leave-active { transition: all 0.2s ease; }
-.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(8px); }
 </style>

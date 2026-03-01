@@ -1,45 +1,8 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
 import { useDeviceStore } from '@/stores/device'
-import { on, off } from '@/composables/useMidi.js'
+import { midiActivity } from '@/composables/useWebSocket'
 
-const device  = useDeviceStore()
-const midiIn  = ref(false)
-const midiOut = ref(false)
-let inTimer  = null
-let outTimer = null
-
-function flashIn() {
-  midiIn.value = true
-  clearTimeout(inTimer)
-  inTimer = setTimeout(() => { midiIn.value = false }, 80)
-}
-
-function flashOut() {
-  midiOut.value = true
-  clearTimeout(outTimer)
-  outTimer = setTimeout(() => { midiOut.value = false }, 80)
-}
-
-onMounted(() => {
-  on('cc',      flashIn)
-  on('noteon',  flashIn)
-  on('noteoff', flashIn)
-  on('sysex',   flashIn)
-  on('sysexout', flashOut)
-  on('ccout',    flashOut)
-})
-
-onUnmounted(() => {
-  off('cc',      flashIn)
-  off('noteon',  flashIn)
-  off('noteoff', flashIn)
-  off('sysex',   flashIn)
-  off('sysexout', flashOut)
-  off('ccout',    flashOut)
-  clearTimeout(inTimer)
-  clearTimeout(outTimer)
-})
+const device = useDeviceStore()
 </script>
 
 <template>
@@ -57,9 +20,9 @@ onUnmounted(() => {
 
     <div class="status-bar__midi">
       <span class="status-bar__midi-label">MIDI</span>
-      <span class="status-bar__midi-dot" :class="{ 'status-bar__midi-dot--in': midiIn }" title="MIDI In" />
+      <span class="status-bar__midi-dot" :class="{ 'status-bar__midi-dot--in': midiActivity.in }" title="MIDI In" />
       <span class="status-bar__midi-label status-bar__midi-label--dim">IN</span>
-      <span class="status-bar__midi-dot" :class="{ 'status-bar__midi-dot--out': midiOut }" title="MIDI Out" />
+      <span class="status-bar__midi-dot" :class="{ 'status-bar__midi-dot--out': midiActivity.out }" title="MIDI Out" />
       <span class="status-bar__midi-label status-bar__midi-label--dim">OUT</span>
     </div>
   </footer>

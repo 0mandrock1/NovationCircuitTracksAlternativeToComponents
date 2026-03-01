@@ -1,7 +1,16 @@
 <script setup>
+import { ref } from 'vue'
 import { useDeviceStore } from '@/stores/device'
 
 const device = useDeviceStore()
+
+const theme = ref(localStorage.getItem('theme') || 'dark')
+
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  document.documentElement.dataset.theme = theme.value
+  localStorage.setItem('theme', theme.value)
+}
 </script>
 
 <template>
@@ -9,9 +18,20 @@ const device = useDeviceStore()
     <div class="app-header__logo">
       <span class="app-header__logo-text">Circuit Tracks UI</span>
     </div>
-    <div class="app-header__status" :class="{ 'app-header__status--connected': device.connected }">
-      <span class="app-header__status-dot" />
-      <span class="app-header__status-text">{{ device.statusText }}</span>
+
+    <div class="app-header__right">
+      <button
+        class="app-header__theme-btn"
+        :title="theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+        @click="toggleTheme"
+      >
+        {{ theme === 'dark' ? '☀' : '🌙' }}
+      </button>
+
+      <div class="app-header__status" :class="{ 'app-header__status--connected': device.connected }">
+        <span class="app-header__status-dot" />
+        <span class="app-header__status-text">{{ device.statusText }}</span>
+      </div>
     </div>
   </header>
 </template>
@@ -35,6 +55,28 @@ const device = useDeviceStore()
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
+
+.app-header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.app-header__theme-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color var(--transition-fast);
+  color: var(--color-text);
+}
+.app-header__theme-btn:hover { border-color: var(--color-text-muted); }
 
 .app-header__status {
   display: flex;
