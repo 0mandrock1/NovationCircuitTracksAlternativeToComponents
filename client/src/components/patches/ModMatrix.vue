@@ -31,7 +31,7 @@ const slots = computed(() =>
 function updateSlot(index, field, value) {
   if (!props.patch.params?.modMatrix) return
   props.patch.params.modMatrix[index][field] = Number(value)
-  store.sendToDevice(props.patchIndex)
+  store.updateParam({ modMatrix: props.patch.params.modMatrix })
 }
 </script>
 

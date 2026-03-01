@@ -14,7 +14,7 @@ const p = computed(() => props.patch.params ?? {})
 function updateMacro(index, value) {
   if (!props.patch.params?.macros) return
   props.patch.params.macros[index] = value
-  store.sendToDevice(props.patchIndex)
+  store.updateParam({ macros: props.patch.params.macros })
 }
 </script>
 

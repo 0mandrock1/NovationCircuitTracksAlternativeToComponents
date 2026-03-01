@@ -14,9 +14,8 @@ const store = usePatchesStore()
 // Read helpers
 const p = computed(() => props.patch.params ?? {})
 
-// ── Generic param update → REST PUT + send to device ─────────────────────────
-async function update(path, value) {
-  // Update local params optimistically
+// ── Generic param update → rawBytes → debounced SysEx ────────────────────────
+function update(path, value) {
   const parts = path.split('.')
   let obj = props.patch.params
   if (!obj) return
@@ -24,8 +23,9 @@ async function update(path, value) {
   if (!obj) return
   obj[parts[parts.length - 1]] = value
 
-  // Mirror to device via REST (no-wait for smooth UX)
-  await store.sendToDevice(props.patchIndex)
+  const topKey = parts[0]
+  const topVal = parts.length > 1 ? props.patch.params[topKey] : value
+  store.updateParam({ [topKey]: topVal })
 }
 
 // Named aliases for template readability

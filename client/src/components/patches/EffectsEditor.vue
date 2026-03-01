@@ -31,7 +31,10 @@ function update(path, value) {
   for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]]
   if (!obj) return
   obj[parts[parts.length - 1]] = value
-  store.sendToDevice(props.patchIndex)
+
+  const topKey = parts[0]
+  const topVal = parts.length > 1 ? props.patch.params[topKey] : value
+  store.updateParam({ [topKey]: topVal })
 }
 </script>
 

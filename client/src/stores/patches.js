@@ -4,6 +4,7 @@ import { sendSysEx, sendSysExAndWait } from '@/composables/useMidi.js'
 import {
   buildRequestPatchDump, buildRequestCurrentPatch, buildReplaceCurrentPatch, buildWritePatch,
   buildPatchDumpMessage, buildBankSyx, parseSyxFile, parseSysEx, decodePatchName,
+  paramsToBytesPartial, rawBytesToParams, defaultPatchBytes,
 } from '@/midi/sysex.js'
 import { CMD_PATCH_DUMP, CMD_CURRENT_PATCH_DUMP, SYNTH_TRACK_1, SYNTH_TRACK_2, SYSEX_MIN_DELAY_MS } from '@/midi/constants.js'
 
@@ -112,6 +113,27 @@ export const usePatchesStore = defineStore('patches', () => {
     }
   }
 
+  // ── Live param update → SysEx ────────────────────────────────────────────────
+
+  let _sendTimer = null
+  function _scheduleSend(rawBytes) {
+    clearTimeout(_sendTimer)
+    _sendTimer = setTimeout(() => {
+      sendSysEx(buildReplaceCurrentPatch(rawBytes, _synthTrack(activeTrack.value)))
+    }, 30)
+  }
+
+  /** Update patch params, rebuild rawBytes, and schedule debounced SysEx send. */
+  function updateParam(partialParams) {
+    const slot = patches.value[activeTrack.value][activePatchIndex.value]
+    if (!slot) return
+    const newRaw  = paramsToBytesPartial(partialParams, slot.rawBytes ?? defaultPatchBytes())
+    slot.rawBytes = newRaw
+    slot.params   = rawBytesToParams(newRaw)
+    slot.hasData  = true
+    _scheduleSend(newRaw)
+  }
+
   // ── Send to device ───────────────────────────────────────────────────────────
 
   /** Audition (replace current patch, no bank write). */
@@ -208,6 +230,7 @@ export const usePatchesStore = defineStore('patches', () => {
     fetchingAll, sendingAll, fetchProgress, sendProgress, error,
     fetchFromDevice, fetchAllFromDevice, cancelFetchAll, fetchCurrentPatch,
     sendToDevice, writeToDevice, sendAllToDevice, cancelSendAll,
+    updateParam,
     exportPatchSyx, exportBankSyx, importSyx,
     renamePatch, deletePatch,
   }
