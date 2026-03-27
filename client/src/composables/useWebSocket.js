@@ -3,6 +3,7 @@ import { useDeviceStore } from '@/stores/device'
 import { usePatchesStore } from '@/stores/patches'
 import { useMixerStore } from '@/stores/mixer'
 import { useSequencerStore } from '@/stores/sequencer'
+import { on as midiOn, isConnected as midiConnected } from '@/composables/useMidi.js'
 
 let ws = null
 let reconnectTimer = null
@@ -13,7 +14,7 @@ export const midiActivity = reactive({ in: false, out: false })
 let inTimer = null
 let outTimer = null
 
-function flashMidiIn() {
+export function flashMidiIn() {
   midiActivity.in = true
   clearTimeout(inTimer)
   inTimer = setTimeout(() => { midiActivity.in = false }, 300)
@@ -25,20 +26,14 @@ export function flashMidiOut() {
   outTimer = setTimeout(() => { midiActivity.out = false }, 300)
 }
 
-// ── Patch window.fetch to detect MIDI-out API calls ───────────────────────────
-let fetchPatched = false
-function patchFetch() {
-  if (fetchPatched || typeof window === 'undefined') return
-  fetchPatched = true
-  const orig = window.fetch
-  window.fetch = function (url, ...args) {
-    const s = String(url)
-    if (s.includes('/api/mixer/cc') || s.includes('/api/transport/')) {
-      flashMidiOut()
-    }
-    return orig.call(this, url, ...args)
-  }
-}
+// ── Wire Web MIDI events to activity indicators (once at module load) ─────────
+midiOn('ccout',    flashMidiOut)
+midiOn('sysexout', flashMidiOut)
+midiOn('noteout',  flashMidiOut)
+midiOn('nrpnout',  flashMidiOut)
+midiOn('cc',       flashMidiIn)
+midiOn('sysex',    flashMidiIn)
+midiOn('noteon',   flashMidiIn)
 
 // ── WebSocket connection ───────────────────────────────────────────────────────
 function connect() {
@@ -84,7 +79,8 @@ function dispatch(msg) {
     case 'midi:cc':
       flashMidiIn()
       device.recordActivity()
-      useMixerStore().applyIncomingCC(msg.channel, msg.controller, msg.value)
+      // Guard: if Web MIDI is active, CC is already handled client-side
+      if (!midiConnected()) useMixerStore().applyIncomingCC(msg.channel, msg.controller, msg.value)
       break
 
     case 'midi:noteon':
@@ -94,12 +90,15 @@ function dispatch(msg) {
       break
 
     case 'sequencer:step':
-      flashMidiIn()
-      useSequencerStore().playingStep = msg.step
+      // Guard: if Web MIDI clock is running, step is driven by useMidi directly
+      if (!midiConnected()) {
+        flashMidiIn()
+        useSequencerStore().setPlayingStep(msg.step)
+      }
       break
 
     case 'sequencer:transport':
-      useSequencerStore().transportState = msg.state
+      if (!midiConnected()) useSequencerStore().setTransportState(msg.state)
       break
   }
 
@@ -110,7 +109,6 @@ function dispatch(msg) {
 
 export function useWebSocket() {
   connect()
-  patchFetch()
 
   function on(type, handler) {
     if (!listeners.has(type)) listeners.set(type, [])
@@ -127,5 +125,4 @@ export function useWebSocket() {
 
 export function initWebSocket() {
   connect()
-  patchFetch()
 }

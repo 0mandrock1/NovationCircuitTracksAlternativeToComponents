@@ -70,10 +70,21 @@ export const useDeviceStore = defineStore('device', () => {
     lastActivity.value = Date.now()
   }
 
+  // Called by WebSocket when the server-side device status changes
+  function setConnected(port) {
+    connected.value = true
+    portName.value  = port ?? ''
+  }
+  function setDisconnected() {
+    connected.value = false
+    portName.value  = ''
+  }
+
   return {
     connected, portName, firmwareVersion, availablePorts, lastActivity,
     midiInitialized, midiSupported,
     statusText,
     initMidi, fetchPorts, connect, disconnect, recordActivity,
+    setConnected, setDisconnected,
   }
 })

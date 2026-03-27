@@ -1,13 +1,19 @@
 <script setup>
 import { useSequencerStore } from '@/stores/sequencer'
+import { sendStart, sendStop, sendContinue, isConnected } from '@/composables/useMidi.js'
 import StepGrid from '@/components/sequencer/StepGrid.vue'
 
 const store = useSequencerStore()
 
 async function sendTransport(action) {
-  try {
-    await fetch(`/api/transport/${action}`, { method: 'POST' })
-  } catch { /* no device */ }
+  if (isConnected()) {
+    if (action === 'play')     sendStart()
+    if (action === 'stop')     sendStop()
+    if (action === 'continue') sendContinue()
+    return
+  }
+  // Fallback to server when Web MIDI not available
+  try { await fetch(`/api/transport/${action}`, { method: 'POST' }) } catch { /* no device */ }
 }
 
 function setStepCount(count) {

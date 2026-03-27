@@ -10,6 +10,10 @@ let _portName     = null
 let lastPortName  = null
 let lastSysExTime = 0
 
+// Client-side MIDI clock
+let _clockTicks   = 0
+let _clockPlaying = false
+
 const listeners        = new Map()
 const pendingResponses = new Map()
 
@@ -25,8 +29,8 @@ function onMidiMessage(ev) {
   const raw    = ev.data
   const status = raw[0]
 
-  // MIDI Clock (0xF8): skip entirely — fires 48+ times/sec
-  if (status === 0xF8) return
+  // MIDI Clock (0xF8): drive client-side clock
+  if (status === 0xF8) { _clockTick(); return }
 
   const data    = Array.from(raw)
   const type    = status & 0xF0
@@ -50,9 +54,9 @@ function onMidiMessage(ev) {
     return
   }
 
-  if (status === 0xFA) { emit('transport', 'start');    return }
-  if (status === 0xFB) { emit('transport', 'continue'); return }
-  if (status === 0xFC) { emit('transport', 'stop');     return }
+  if (status === 0xFA) { _clockTicks = 0; _clockPlaying = true;  emit('transport', 'start');    return }
+  if (status === 0xFB) {                  _clockPlaying = true;  emit('transport', 'continue'); return }
+  if (status === 0xFC) {                  _clockPlaying = false; emit('transport', 'stop');     return }
 
   if (type === 0x80) { emit('noteoff', { channel, note: data[1], velocity: data[2] }); return }
   if (type === 0x90) { emit('noteon',  { channel, note: data[1], velocity: data[2] }); return }
@@ -80,6 +84,16 @@ function _handlePortsChange() {
   if (!inputPort && lastPortName && ports.includes(lastPortName)) {
     connect(lastPortName)  // fire-and-forget for auto-reconnect
   }
+}
+
+function _clockTick() {
+  if (!_clockPlaying) return
+  _clockTicks++
+  if (_clockTicks % 6 === 0) {
+    const step = ((_clockTicks / 6) - 1) % 32
+    emit('clock:step', step)
+  }
+  if (_clockTicks >= 192) _clockTicks = 0
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -174,6 +188,31 @@ export async function sendSysEx(bytes) {
   } catch { /* port may have closed */ }
 }
 
+export function sendStart()    { outputPort?.send([0xFA]) }
+export function sendStop()     { outputPort?.send([0xFC]) }
+export function sendContinue() { outputPort?.send([0xFB]) }
+
+export function sendNoteOn(ch, note, vel) {
+  if (!outputPort) return
+  outputPort.send([0x90 | (ch & 0x0F), note & 0x7F, vel & 0x7F])
+  emit('noteout', { channel: ch, note, velocity: vel })
+}
+
+export function sendNoteOff(ch, note, vel = 0) {
+  if (!outputPort) return
+  outputPort.send([0x80 | (ch & 0x0F), note & 0x7F, vel & 0x7F])
+}
+
+export function sendNRPN(ch, msb, lsb, value) {
+  if (!outputPort) return
+  const c = ch & 0x0F
+  outputPort.send([0xB0 | c, 99, msb & 0x7F])
+  outputPort.send([0xB0 | c, 98, lsb & 0x7F])
+  outputPort.send([0xB0 | c,  6, value & 0x7F])
+  outputPort.send([0xB0 | c, 38, 0])
+  emit('nrpnout', { channel: ch, msb, lsb, value })
+}
+
 export function sendSysExAndWait(bytes, responseCmd, timeout = SYSEX_DUMP_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -201,7 +240,12 @@ export function off(event, handler) {
 }
 
 export function useMidi() {
-  return { requestAccess, getPorts, connect, disconnect, forgetDevice, getPortName, isConnected, sendCC, sendSysEx, sendSysExAndWait, on, off }
+  return {
+    requestAccess, getPorts, connect, disconnect, forgetDevice, getPortName, isConnected,
+    sendCC, sendSysEx, sendSysExAndWait, sendStart, sendStop, sendContinue,
+    sendNoteOn, sendNoteOff, sendNRPN,
+    on, off,
+  }
 }
 
 export default useMidi
