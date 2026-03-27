@@ -34,28 +34,31 @@ export function setupWebSocket(server) {
       const b = await getBanks()
 
       if (parsed.type === 'patchDump') {
-        const { patchIndex, rawBytes } = parsed
+        const { bank, patchIndex, rawBytes } = parsed
+        const trackIdx = bank === 1 ? 1 : 0
         if (patchIndex >= 0 && patchIndex < 64) {
-          b[0][patchIndex] = {
+          b[trackIdx][patchIndex] = {
             index:   patchIndex,
             rawBytes: Array.from(rawBytes),
             name:    decodePatchName(rawBytes),
             params:  rawBytesToParams(rawBytes),
           }
           wss.broadcast({
-            type:   'patch:update',
-            track:  0,
-            index:  patchIndex,
-            name:   b[0][patchIndex].name,
-            params: b[0][patchIndex].params,
+            type:     'patch:update',
+            track:    trackIdx,
+            index:    patchIndex,
+            name:     b[trackIdx][patchIndex].name,
+            params:   b[trackIdx][patchIndex].params,
+            rawBytes: b[trackIdx][patchIndex].rawBytes,
           })
         }
       }
 
       if (parsed.type === 'currentPatchDump') {
+        const trackIdx = parsed.bank === 1 ? 1 : 0
         wss.broadcast({
           type:     'patch:currentDump',
-          track:    0,
+          track:    trackIdx,
           params:   parsed.params,
           rawBytes: Array.from(parsed.rawBytes),
         })

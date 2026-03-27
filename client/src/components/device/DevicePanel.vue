@@ -1,10 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useDeviceStore } from '@/stores/device'
-import { useToast } from '@/composables/useToast'
 
 const device = useDeviceStore()
-const { toast } = useToast()
 
 const tempo       = ref(120)
 const swing       = ref(0)
@@ -30,19 +28,45 @@ function handleDisconnect() {
   device.disconnect()
 }
 
-// Global settings are sent via SysEx — placeholder until SysEx commands are specified
 async function applyTempo() {
-  applyStatus.value = 'Tempo: not yet implemented'
+  try {
+    const res = await fetch('/api/device/tempo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bpm: tempo.value }),
+    })
+    applyStatus.value = res.ok ? `Tempo set to ${tempo.value} BPM` : 'Tempo: server error'
+  } catch {
+    applyStatus.value = 'Tempo: connection error'
+  }
   setTimeout(() => { applyStatus.value = '' }, 2000)
 }
 
 async function applySwing() {
-  applyStatus.value = 'Swing: not yet implemented'
+  try {
+    const res = await fetch('/api/device/swing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: swing.value }),
+    })
+    applyStatus.value = res.ok ? `Swing set to ${swing.value}%` : 'Swing: server error'
+  } catch {
+    applyStatus.value = 'Swing: connection error'
+  }
   setTimeout(() => { applyStatus.value = '' }, 2000)
 }
 
 async function applyTranspose() {
-  applyStatus.value = 'Transpose: not yet implemented'
+  try {
+    const res = await fetch('/api/device/transpose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ semitones: transpose.value }),
+    })
+    applyStatus.value = res.ok ? `Transpose set to ${transpose.value > 0 ? '+' : ''}${transpose.value}` : 'Transpose: server error'
+  } catch {
+    applyStatus.value = 'Transpose: connection error'
+  }
   setTimeout(() => { applyStatus.value = '' }, 2000)
 }
 </script>
@@ -150,6 +174,10 @@ async function applyTranspose() {
           @keydown.enter="applyTranspose"
         />
         <button class="btn btn--sm btn--secondary" @click="applyTranspose">Apply</button>
+      </div>
+
+      <div v-if="applyStatus" class="gs-status" :class="{ 'gs-status--error': applyStatus.includes('error') }">
+        {{ applyStatus }}
       </div>
 
     </section>
