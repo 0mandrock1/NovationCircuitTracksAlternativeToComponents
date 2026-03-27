@@ -1,13 +1,23 @@
 <script setup>
+import { useDeviceStore } from '@/stores/device'
 import { useMixerStore } from '@/stores/mixer'
 import MixerChannel from '@/components/mixer/MixerChannel.vue'
 
-const store = useMixerStore()
+const device = useDeviceStore()
+const store  = useMixerStore()
 </script>
 
 <template>
   <div class="mixer-view">
-    <h2>Mixer</h2>
+    <div class="mixer-view__header">
+      <h2>Mixer</h2>
+      <button
+        class="mixer-view__sync-btn"
+        :disabled="!device.connected"
+        :title="device.connected ? 'Push all values to device' : 'Not connected'"
+        @click="store.syncToDevice()"
+      >↑ Sync to device</button>
+    </div>
     <div class="mixer-view__channels">
       <MixerChannel
         v-for="(channel, index) in store.channels"
@@ -41,6 +51,37 @@ const store = useMixerStore()
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+}
+
+.mixer-view__header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.mixer-view__header h2 {
+  margin: 0;
+}
+
+.mixer-view__sync-btn {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.mixer-view__sync-btn:not(:disabled):hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.mixer-view__sync-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .mixer-view__channels {
