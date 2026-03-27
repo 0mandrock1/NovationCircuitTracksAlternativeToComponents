@@ -570,8 +570,35 @@
     <div class="test-title">Distortion type NRPN <span class="badge badge-midi">MIDI</span></div>
     <div class="test-steps"><ol>
       <li>Click each distortion type button (Saturate, Clip, Fold, etc.)</li>
+      <li>Monitor MIDI OUT indicator and MIDI Tester if available</li>
     </ol></div>
-    <div class="expected">✓ MIDI OUT flashes for each click. Distortion character changes on device. <span class="warn">⚠ Type resets to first on page reload (known limitation).</span></div>
+    <div class="expected">✓ MIDI OUT flashes for each click. NRPN bytes visible in MIDI Tester (not a plain CC). Distortion character changes on device. <span class="warn">⚠ Type resets to first on page reload (known limitation).</span></div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Chorus type toggle (Phaser / Chorus) NRPN <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Locate the Chorus Type toggle (Phaser / Chorus) in the Effects sub-tab</li>
+      <li>Click to toggle between Phaser and Chorus</li>
+      <li>Watch MIDI OUT indicator</li>
+    </ol></div>
+    <div class="expected">✓ MIDI OUT flashes on each click. NRPN message sent (not plain CC). Sound character changes on device. <span class="warn">⚠ Type resets to first on page reload (known limitation).</span></div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Delay/Reverb preset buttons are display-only <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click any Delay preset button (16 options)</li>
+      <li>Click any Reverb preset button (8 options)</li>
+      <li>Watch MIDI OUT indicator</li>
+    </ol></div>
+    <div class="expected">✓ Button highlights update (UI selection only). MIDI OUT does <strong>not</strong> flash — no MIDI is sent. Circuit Tracks has no remote CC/SysEx for preset selection.</div>
   </div>
 </div>
 
@@ -699,6 +726,31 @@
   </div>
 </div>
 
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Server-side files persist across page reload <span class="badge badge-server">SERVER</span></div>
+    <div class="test-steps"><ol>
+      <li>Upload a WAV file into slot 1 (it is saved to <span class="code">data/samples/</span>)</li>
+      <li>Reload the page (F5)</li>
+      <li>Navigate to Samples tab</li>
+    </ol></div>
+    <div class="expected">✓ Slot 1 shows the filename loaded from the server (loadFromServer path). Other slots remain empty. No crash on load.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Audio preview uses server stream when no local Object URL <span class="badge badge-server">SERVER</span></div>
+    <div class="test-steps"><ol>
+      <li>Upload a sample, then reload the page (clears local Object URL)</li>
+      <li>Click ▶ on the slot that was loaded from server</li>
+    </ol></div>
+    <div class="expected">✓ Audio plays from <span class="code">GET /api/samples/:index/audio</span>. Seek bar functional (server sends HTTP 206 partial content). No "can't play" error.</div>
+  </div>
+</div>
+
 <!-- ══════════════════════════════════════════════════════════════ -->
 <h2>4 — Sequencer Tab</h2>
 
@@ -757,12 +809,38 @@
 <div class="test-item">
   <div class="cb"></div>
   <div class="test-body">
-    <div class="test-title">Step highlight sync with MIDI clock <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-title">Step highlight sync with MIDI clock — Web MIDI path <span class="badge badge-midi">MIDI</span></div>
     <div class="test-steps"><ol>
+      <li>Ensure Web MIDI is connected (Device tab shows green)</li>
       <li>Press Play on the Circuit Tracks hardware directly</li>
       <li>Watch step highlight in the browser</li>
     </ol></div>
-    <div class="expected">✓ Browser step highlight matches device playhead. Tempo synced.</div>
+    <div class="expected">✓ Browser step highlight advances in sync with device tempo. MIDI IN indicator flashes on each clock tick. Highlight driven by Web MIDI (not WebSocket).</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Stop clears highlight and releases notes <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Start playback (Play button or device hardware)</li>
+      <li>Click ■ (Stop) in the browser</li>
+    </ol></div>
+    <div class="expected">✓ MIDI Stop (0xFC) sent. Step highlight resets to -1 (no cell highlighted). No stuck NoteOn — all active notes receive NoteOff.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Transport fallback — server REST when Web MIDI not connected <span class="badge badge-server">SERVER</span></div>
+    <div class="test-steps"><ol>
+      <li>Disconnect Web MIDI in Device tab (or use a browser with no MIDI device connected)</li>
+      <li>Click ▶ (Play) in Sequencer tab</li>
+      <li>Click ■ (Stop)</li>
+    </ol></div>
+    <div class="expected">✓ App calls <span class="code">POST /api/transport</span> with <span class="code">&#123;"action":"start"&#125;</span> / <span class="code">&#123;"action":"stop"&#125;</span>. Server relays MIDI Start/Stop to device. Step highlight updates via WebSocket <span class="code">sequencer:transport</span> and <span class="code">sequencer:step</span> events.</div>
   </div>
 </div>
 
@@ -1164,6 +1242,63 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════ -->
+<h2>11 — Vercel Deployment (frontend-only mode)</h2>
+
+<div class="callout">
+  <strong>Context:</strong> The Vue frontend can be deployed to Vercel as a static SPA.
+  The Node.js MIDI backend cannot run on Vercel (native modules, WebSocket server).
+  In this mode the app uses <strong>Web MIDI API only</strong> — no server relay, no patch persistence across reloads.
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Local Vercel build completes without errors <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>From project root, run <span class="code">npm run vercel:build</span></li>
+    </ol></div>
+    <div class="expected">✓ No build errors. <span class="code">client/dist/index.html</span> exists. <span class="code">client/dist/assets/</span> folder contains JS/CSS bundles.</div>
+    <div class="result-box"></div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">App loads without server (Web MIDI only mode) <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Serve <span class="code">client/dist/</span> statically (e.g. <span class="code">npx serve client/dist</span>)</li>
+      <li>Open in Chrome/Edge (no Node.js server running)</li>
+    </ol></div>
+    <div class="expected">✓ App loads. All tabs render. Device tab shows MIDI port list when MIDI enabled. No JS crash on initial load.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">WebSocket connection failure is silent <span class="badge badge-ws">WS</span></div>
+    <div class="test-steps"><ol>
+      <li>With no server running, open the production build</li>
+      <li>Open DevTools → Console</li>
+      <li>Wait 10 seconds</li>
+    </ol></div>
+    <div class="expected">✓ No uncaught error or exception in console. At most a single "WebSocket connection failed" warning (browser-generated, not thrown). Reconnect loop runs silently every 3 seconds.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">SPA routing works on direct URL access <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Navigate directly to <span class="code">/patches</span> (or any deep route) in the production build</li>
+    </ol></div>
+    <div class="expected">✓ Correct view loads (not a 404). Vercel rewrites route to <span class="code">index.html</span>.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
 <h2>Known Limitations — Do Not File as Bugs</h2>
 
 <div class="limitation">Firmware version is always "unknown" — SysEx query not implemented.</div>
@@ -1195,6 +1330,7 @@
   <tr><td>MIDI Tester tool</td><td></td><td></td></tr>
   <tr><td>WebSocket relay + reconnect</td><td></td><td></td></tr>
   <tr><td>Edge cases &amp; error handling</td><td></td><td></td></tr>
+  <tr><td>Vercel deployment (frontend-only build)</td><td></td><td></td></tr>
 </table>
 
 <div style="margin-top:16px; display:flex; gap:40px; font-size:10px; color:#555;">
