@@ -1,6 +1,8 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { usePatchesStore } from '@/stores/patches'
+import { sendNRPN } from '@/composables/useMidi.js'
+import { CH_SYNTH1, CH_SYNTH2, NRPN_DISTORTION_TYPE, NRPN_CHORUS_TYPE, DISTORTION_TYPES } from '@/midi/constants.js'
 import Knob   from '@/components/ui/Knob.vue'
 import Toggle from '@/components/ui/Toggle.vue'
 
@@ -11,6 +13,16 @@ const props = defineProps({
 
 const store = usePatchesStore()
 const p = computed(() => props.patch.params ?? {})
+
+const synthChannel = computed(() => store.activeTrack === 0 ? CH_SYNTH1 : CH_SYNTH2)
+
+// Local visual-only state for presets (not in SysEx patch data)
+const selectedDelayPreset  = ref(0)
+const selectedReverbPreset = ref(0)
+
+// NRPN-driven effect type state
+const selectedDistortionType = ref(0)
+const selectedChorusType     = ref(0)  // 0=Phaser, 1=Chorus
 
 // Circuit Tracks delay presets (16 slots)
 const DELAY_PRESETS = [
@@ -36,6 +48,16 @@ function update(path, value) {
   const topVal = parts.length > 1 ? props.patch.params[topKey] : value
   store.updateParam({ [topKey]: topVal })
 }
+
+function setDistortionType(i) {
+  selectedDistortionType.value = i
+  sendNRPN(synthChannel.value, NRPN_DISTORTION_TYPE.msb, NRPN_DISTORTION_TYPE.lsb, i)
+}
+
+function setChorusType(type) {
+  selectedChorusType.value = type
+  sendNRPN(synthChannel.value, NRPN_CHORUS_TYPE.msb, NRPN_CHORUS_TYPE.lsb, type)
+}
 </script>
 
 <template>
@@ -59,6 +81,15 @@ function update(path, value) {
           color="var(--color-accent)"
         />
       </div>
+      <div class="ee-type-label">Type</div>
+      <div class="ee-presets">
+        <button
+          v-for="(name, i) in DISTORTION_TYPES" :key="i"
+          class="ee-preset-btn"
+          :class="{ 'ee-preset-btn--active': selectedDistortionType === i }"
+          @click="setDistortionType(i)"
+        >{{ name }}</button>
+      </div>
     </section>
 
     <!-- Chorus -->
@@ -77,30 +108,49 @@ function update(path, value) {
         <Knob :model-value="p.chorus?.feedback ?? 0"  @update:model-value="v => update('chorus.feedback', v)" label="Feedback" :size="52" color="var(--color-info)" />
         <Knob :model-value="p.chorus?.mix      ?? 64" @update:model-value="v => update('chorus.mix',      v)" label="Mix"      :size="52" color="var(--color-info)" />
       </div>
+      <div class="ee-type-label">Type</div>
+      <div class="ee-presets">
+        <button
+          class="ee-preset-btn"
+          :class="{ 'ee-preset-btn--active': selectedChorusType === 0 }"
+          @click="setChorusType(0)"
+        >Phaser</button>
+        <button
+          class="ee-preset-btn"
+          :class="{ 'ee-preset-btn--active': selectedChorusType === 1 }"
+          @click="setChorusType(1)"
+        >Chorus</button>
+      </div>
     </section>
 
-    <!-- Delay preset -->
+    <!-- Delay preset (display only — preset algorithm not remotely controllable) -->
     <section class="ee-section">
-      <h3 class="ee-section__title">Delay Preset</h3>
+      <div class="ee-section__header">
+        <h3 class="ee-section__title">Delay Preset</h3>
+        <span class="ee-display-only" title="Preset selection is display-only — not remotely controllable on Circuit Tracks">Display only</span>
+      </div>
       <div class="ee-presets">
         <button
           v-for="(name, i) in DELAY_PRESETS" :key="i"
           class="ee-preset-btn"
-          :class="{ 'ee-preset-btn--active': (p.delayPreset ?? 0) === i }"
-          @click="update('delayPreset', i)"
+          :class="{ 'ee-preset-btn--active': selectedDelayPreset === i }"
+          @click="selectedDelayPreset = i"
         >{{ name }}</button>
       </div>
     </section>
 
-    <!-- Reverb preset -->
+    <!-- Reverb preset (display only) -->
     <section class="ee-section">
-      <h3 class="ee-section__title">Reverb Preset</h3>
+      <div class="ee-section__header">
+        <h3 class="ee-section__title">Reverb Preset</h3>
+        <span class="ee-display-only" title="Preset selection is display-only — not remotely controllable on Circuit Tracks">Display only</span>
+      </div>
       <div class="ee-presets">
         <button
           v-for="(name, i) in REVERB_PRESETS" :key="i"
           class="ee-preset-btn"
-          :class="{ 'ee-preset-btn--active': (p.reverbPreset ?? 0) === i }"
-          @click="update('reverbPreset', i)"
+          :class="{ 'ee-preset-btn--active': selectedReverbPreset === i }"
+          @click="selectedReverbPreset = i"
         >{{ name }}</button>
       </div>
     </section>
@@ -146,6 +196,22 @@ function update(path, value) {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--color-text-muted);
+}
+
+.ee-display-only {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  cursor: help;
+  font-style: italic;
+}
+
+.ee-type-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: var(--spacing-sm) 0 4px;
 }
 
 .ee-row {

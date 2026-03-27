@@ -47,6 +47,13 @@ export const CH_DRUM4  = 8   // Ch 9
 export const MIDI_TRACK_COUNT      = 4
 export const MIDI_RESERVED_CHANNEL = 16
 
+// NRPN effects parameters (MSB:LSB from Circuit Tracks Programmer's Reference v3)
+export const NRPN_DISTORTION_TYPE = { msb: 1, lsb: 0 }   // 0–6
+export const NRPN_CHORUS_TYPE     = { msb: 1, lsb: 24 }  // 0=Phaser, 1=Chorus
+
+// Distortion type names for NRPN_DISTORTION_TYPE values 0–6
+export const DISTORTION_TYPES = ['Diode', 'Valve', 'Clipper', 'X-Shape', 'Bit Crush', 'Rate Red.', 'Decimator']
+
 export const DEVICE_PORT_PATTERNS = [
   /circuit tracks/i,
   /circuit/i,
