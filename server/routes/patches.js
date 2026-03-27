@@ -137,7 +137,7 @@ router.post('/:index/fetch', async (req, res) => {
   if (!midiManager.isConnected()) return res.status(503).json({ error: 'Device not connected' })
 
   try {
-    const resp   = await midiManager.sendSysExAndWait(buildRequestPatchDump(index), CMD_PATCH_DUMP)
+    const resp   = await midiManager.sendSysExAndWait(buildRequestPatchDump(index, _synthSelector(track)), CMD_PATCH_DUMP)
     const parsed = parseSysEx(resp)
     if (!parsed || parsed.type !== 'patchDump') return res.status(500).json({ error: 'Unexpected SysEx response' })
     banks[track][index] = _slotFromRaw(parsed.rawBytes, index)
@@ -155,7 +155,7 @@ router.post('/fetch-all', async (req, res) => {
   const results = []
   for (let i = 0; i < PATCH_BANK_SIZE; i++) {
     try {
-      const resp   = await midiManager.sendSysExAndWait(buildRequestPatchDump(i), CMD_PATCH_DUMP)
+      const resp   = await midiManager.sendSysExAndWait(buildRequestPatchDump(i, _synthSelector(track)), CMD_PATCH_DUMP)
       const parsed = parseSysEx(resp)
       if (parsed?.type === 'patchDump') {
         banks[track][i] = _slotFromRaw(parsed.rawBytes, i)

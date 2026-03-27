@@ -53,7 +53,7 @@ export const usePatchesStore = defineStore('patches', () => {
 
   async function fetchFromDevice(index, timeout = FETCH_ONE_TIMEOUT_MS) {
     try {
-      const raw    = await sendSysExAndWait(buildRequestPatchDump(index), CMD_PATCH_DUMP, timeout)
+      const raw    = await sendSysExAndWait(buildRequestPatchDump(index, _synthTrack(activeTrack.value)), CMD_PATCH_DUMP, timeout)
       const parsed = parseSysEx(raw)
       if (parsed?.type === 'patchDump') {
         patches.value[activeTrack.value][index] = {
@@ -206,13 +206,39 @@ export const usePatchesStore = defineStore('patches', () => {
       if (!parsed.length) { error.value = 'No valid patches found in file'; return { ok: false } }
       for (const { patchIndex, rawBytes } of parsed) {
         patches.value[activeTrack.value][patchIndex] = {
-          index: patchIndex, name: decodePatchName(rawBytes), hasData: true, params: null, rawBytes,
+          index: patchIndex, name: decodePatchName(rawBytes), hasData: true, params: rawBytesToParams(rawBytes), rawBytes,
         }
       }
       return { ok: true, count: parsed.length }
     } catch (e) {
       error.value = e.message
       return { ok: false }
+    }
+  }
+
+  // ── WebSocket relay handlers ─────────────────────────────────────────────────
+
+  function handleWsPatchUpdate(msg) {
+    const track = msg.track ?? 0
+    const idx   = msg.index ?? 0
+    if (idx < 0 || idx >= 64) return
+    const slot = patches.value[track]?.[idx]
+    if (!slot) return
+    slot.name     = msg.name     ?? slot.name
+    slot.params   = msg.params   ?? slot.params
+    slot.rawBytes = msg.rawBytes ?? slot.rawBytes
+    slot.hasData  = true
+  }
+
+  function handleWsCurrentDump(msg) {
+    const track = msg.track ?? 0
+    const index = activePatchIndex.value
+    patches.value[track][index] = {
+      index,
+      name:     msg.params?.name ?? `Patch ${index + 1}`,
+      hasData:  true,
+      params:   msg.params  ?? null,
+      rawBytes: msg.rawBytes ?? null,
     }
   }
 
@@ -233,5 +259,6 @@ export const usePatchesStore = defineStore('patches', () => {
     updateParam,
     exportPatchSyx, exportBankSyx, importSyx,
     renamePatch, deletePatch,
+    handleWsPatchUpdate, handleWsCurrentDump,
   }
 })
