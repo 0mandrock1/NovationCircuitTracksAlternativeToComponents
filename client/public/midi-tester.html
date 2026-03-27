@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Circuit Tracks MIDI Tester</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f1117;
+    --surface:  #1a1d27;
+    --surface2: #22263a;
+    --border:   #2e3350;
+    --accent:   #6c63ff;
+    --text:     #e0e2f0;
+    --muted:    #6b7090;
+    --dim:      #9098b8;
+    --success:  #4caf50;
+    --warning:  #ff9800;
+    --error:    #f44336;
+    --radius:   6px;
+    --mono:     'JetBrains Mono', 'Fira Mono', 'Consolas', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ──────────────────────────────────────────────────── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .header__title { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
+  .header__sub   { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .status-dot.connected { background: var(--success); }
+  .status-dot.error     { background: var(--error); }
+
+  /* ── Layout ──────────────────────────────────────────────────── */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 0;
+    height: calc(100vh - 46px);
+  }
+
+  /* ── Sidebar (connection) ────────────────────────────────────── */
+  .sidebar {
+    grid-row: 1 / 3;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+
+  /* ── MIDI IN log ─────────────────────────────────────────────── */
+  .monitor {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 280px;
+  }
+  .monitor__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .monitor__title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .monitor__log {
+    flex: 1;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .log-entry {
+    display: grid;
+    grid-template-columns: 64px 60px 28px 1fr;
+    gap: 6px;
+    padding: 1px 2px;
+    border-radius: 3px;
+    line-height: 1.5;
+    opacity: 0.92;
+  }
+  .log-entry:hover { background: var(--surface2); opacity: 1; }
+  .log-ts    { color: var(--muted); }
+  .log-type  { font-weight: 700; }
+  .log-ch    { color: var(--muted); }
+  .log-data  { color: var(--dim); word-break: break-all; }
+
+  .log-noteon  .log-type { color: #4caf50; }
+  .log-noteoff .log-type { color: #f44336; }
+  .log-cc      .log-type { color: #2196f3; }
+  .log-sysex   .log-type { color: #ff9800; }
+  .log-clock   .log-type { color: #9c27b0; }
+  .log-other   .log-type { color: var(--muted); }
+
+  /* ── Controls area ───────────────────────────────────────────── */
+  .controls {
+    overflow-y: auto;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* ── Shared card ─────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+  .card__title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .row:last-child { margin-bottom: 0; }
+
+  label.lbl {
+    font-size: 11px;
+    color: var(--dim);
+    width: 38px;
+    flex-shrink: 0;
+  }
+
+  input[type="number"], input[type="text"], select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 3px 6px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="number"]:focus, input[type="text"]:focus, select:focus {
+    border-color: var(--accent);
+  }
+  input.num-sm { width: 54px; }
+  input.num-md { width: 68px; }
+  select { cursor: pointer; }
+
+  textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 8px;
+    width: 100%;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  textarea:focus { border-color: var(--accent); }
+
+  button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    transition: border-color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+  button:hover { border-color: var(--accent); }
+  button:active { background: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  button.primary:hover { background: #7b74ff; }
+  button.danger { border-color: #c62828; color: #ef9a9a; }
+  button.danger:hover { background: #c62828; color: #fff; }
+  button.sm { padding: 2px 8px; font-size: 11px; }
+
+  /* ── Quick tests grid ────────────────────────────────────────── */
+  .quick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 6px;
+  }
+  .quick-grid button { text-align: left; font-size: 11px; font-weight: 500; padding: 5px 8px; }
+
+  /* ── Status messages ─────────────────────────────────────────── */
+  .send-status {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--success);
+    height: 14px;
+    margin-top: 4px;
+  }
+  .send-status.err { color: var(--error); }
+
+  /* ── Sidebar specifics ───────────────────────────────────────── */
+  .sidebar .card__title { margin-bottom: 6px; }
+  .sidebar select { width: 100%; }
+  .conn-status {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+    min-height: 16px;
+  }
+  .conn-status.ok  { color: var(--success); }
+  .conn-status.err { color: var(--error); }
+
+  .port-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  .port-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface2);
+    gap: 4px;
+  }
+  .port-list .port-name {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+  .port-list li.active { border-color: var(--success); }
+
+  .hint { font-size: 10px; color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header__title">Circuit Tracks MIDI Tester</div>
+    <div class="header__sub">Standalone MIDI diagnostic tool — no build step required</div>
+  </div>
+  <div id="statusDot" class="status-dot" title="MIDI status"></div>
+</div>
+
+<div class="layout">
+
+  <!-- ── Sidebar: Connection ──────────────────────────── -->
+  <aside class="sidebar">
+    <div class="card">
+      <div class="card__title">Web MIDI Access</div>
+      <button class="primary" id="btnEnable" style="width:100%;margin-bottom:6px">Enable MIDI</button>
+      <div class="conn-status" id="connStatus">Not initialised</div>
+    </div>
+
+    <div class="card">
+      <div class="card__title">MIDI Ports</div>
+      <ul class="port-list" id="portList">
+        <li style="justify-content:center"><span class="port-name" style="text-align:center">—</span></li>
+      </ul>
+      <button style="margin-top:6px;width:100%" id="btnRefresh">Refresh Ports</button>
+    </div>
+
+    <div class="card">
+      <div class="card__title">Active Port</div>
+      <div id="activeOut" class="conn-status">No output selected</div>
+      <div id="activeIn"  class="conn-status" style="margin-top:2px">No input selected</div>
+    </div>
+
+    <div class="card hint">
+      <strong>Tip:</strong> Click a port to select it as both input and output. Ports marked
+      <span style="color:var(--success)">green</span> are active. The IN monitor shows all
+      incoming MIDI — including SysEx responses from the device.
+    </div>
+  </aside>
+
+  <!-- ── MIDI IN Monitor ─────────────────────────────── -->
+  <div class="monitor">
+    <div class="monitor__header">
+      <span class="monitor__title">MIDI IN Monitor</span>
+      <button class="sm" id="btnClear">Clear</button>
+    </div>
+    <div class="monitor__log" id="midiLog">
+      <div class="log-entry log-other">
+        <span class="log-ts">—</span>
+        <span class="log-type">READY</span>
+        <span class="log-ch"></span>
+        <span class="log-data">Enable MIDI and select a port to start monitoring</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Controls ───────────────────────────────────── -->
+  <div class="controls">
+
+    <!-- CC -->
+    <div class="card">
+      <div class="card__title">Send Control Change (CC)</div>
+      <div class="row">
+        <label class="lbl" for="ccCh">Ch</label>
+        <input class="num-sm" type="number" id="ccCh" min="1" max="16" value="1">
+        <label class="lbl" for="ccNum">CC#</label>
+        <input class="num-sm" type="number" id="ccNum" min="0" max="127" value="74">
+        <label class="lbl" for="ccVal">Val</label>
+        <input class="num-sm" type="number" id="ccVal" min="0" max="127" value="64">
+        <button class="primary" id="btnSendCC">Send CC</button>
+      </div>
+      <div class="send-status" id="ccStatus"></div>
+    </div>
+
+    <!-- Note On / Off -->
+    <div class="card">
+      <div class="card__title">Note On / Off</div>
+      <div class="row">
+        <label class="lbl" for="noteCh">Ch</label>
+        <input class="num-sm" type="number" id="noteCh" min="1" max="16" value="1">
+        <label class="lbl" for="noteNum">Note</label>
+        <input class="num-sm" type="number" id="noteNum" min="0" max="127" value="60">
+        <label class="lbl" for="noteVel">Vel</label>
+        <input class="num-sm" type="number" id="noteVel" min="1" max="127" value="100">
+        <button class="primary" id="btnNoteOn">On</button>
+        <button class="danger" id="btnNoteOff">Off</button>
+      </div>
+      <div class="send-status" id="noteStatus"></div>
+    </div>
+
+    <!-- NRPN -->
+    <div class="card">
+      <div class="card__title">Send NRPN</div>
+      <div class="row">
+        <label class="lbl" for="nrpnCh">Ch</label>
+        <input class="num-sm" type="number" id="nrpnCh" min="1" max="16" value="1">
+        <label class="lbl" for="nrpnMsb">MSB</label>
+        <input class="num-sm" type="number" id="nrpnMsb" min="0" max="127" value="0">
+        <label class="lbl" for="nrpnLsb">LSB</label>
+        <input class="num-sm" type="number" id="nrpnLsb" min="0" max="127" value="0">
+        <label class="lbl" for="nrpnVal">Val</label>
+        <input class="num-md" type="number" id="nrpnVal" min="0" max="16383" value="8192">
+        <button id="btnSendNRPN">Send NRPN</button>
+      </div>
+      <div class="send-status" id="nrpnStatus"></div>
+    </div>
+
+    <!-- Transport -->
+    <div class="card">
+      <div class="card__title">Transport</div>
+      <div class="row">
+        <button id="btnStart">&#9654; Start</button>
+        <button id="btnStop">&#9632; Stop</button>
+        <button id="btnContinue">&#9654;&#9654; Continue</button>
+        <button id="btnClock">Send Clock (x1)</button>
+      </div>
+      <div class="send-status" id="transportStatus"></div>
+    </div>
+
+    <!-- SysEx -->
+    <div class="card">
+      <div class="card__title">Send SysEx (hex, space-separated)</div>
+      <textarea id="sysexInput" rows="3" placeholder="F0 00 20 29 01 64 63 00 F7"></textarea>
+      <div class="row" style="margin-top:6px">
+        <button class="primary" id="btnSendSysEx">Send SysEx</button>
+        <span class="hint">Must start with F0 and end with F7</span>
+      </div>
+      <div class="send-status" id="sysexStatus"></div>
+    </div>
+
+    <!-- Circuit Tracks Quick Tests -->
+    <div class="card">
+      <div class="card__title">Circuit Tracks Quick Tests</div>
+      <div class="quick-grid" id="quickGrid">
+        <button data-qt="reqPatchSyn1">Request Current Patch — Syn 1</button>
+        <button data-qt="reqPatchSyn2">Request Current Patch — Syn 2</button>
+        <button data-qt="filterCutoff64">Filter Cutoff → 64 (Ch1)</button>
+        <button data-qt="macroSweep">Macros CC80–87 sweep</button>
+        <button data-qt="panCenter">Pan Center all channels</button>
+        <button data-qt="reverbSend64">Reverb Send → 64 (Ch1)</button>
+        <button data-qt="midiIdentity">MIDI Identity Request</button>
+        <button data-qt="allNotesOff">All Notes Off (Ch1–6)</button>
+      </div>
+      <div class="send-status" id="qtStatus"></div>
+    </div>
+
+  </div><!-- /controls -->
+</div><!-- /layout -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let midiAccess = null
+let selectedOutput = null
+let selectedInput  = null
+
+const statusDot  = document.getElementById('statusDot')
+const connStatus = document.getElementById('connStatus')
+const activeOut  = document.getElementById('activeOut')
+const activeIn   = document.getElementById('activeIn')
+const portList   = document.getElementById('portList')
+const midiLog    = document.getElementById('midiLog')
+
+// ── MIDI Init ──────────────────────────────────────────────────────────────
+document.getElementById('btnEnable').addEventListener('click', enableMidi)
+document.getElementById('btnRefresh').addEventListener('click', refreshPorts)
+document.getElementById('btnClear').addEventListener('click', () => { midiLog.innerHTML = '' })
+
+async function enableMidi() {
+  if (!navigator.requestMIDIAccess) {
+    setConnStatus('Web MIDI API not supported. Use Chrome or Edge.', 'err')
+    statusDot.className = 'status-dot error'
+    return
+  }
+  try {
+    midiAccess = await navigator.requestMIDIAccess({ sysex: true })
+    setConnStatus('MIDI access granted', 'ok')
+    statusDot.className = 'status-dot connected'
+    midiAccess.onstatechange = refreshPorts
+    refreshPorts()
+  } catch (e) {
+    setConnStatus('Access denied: ' + e.message, 'err')
+    statusDot.className = 'status-dot error'
+  }
+}
+
+function refreshPorts() {
+  if (!midiAccess) return
+  portList.innerHTML = ''
+
+  const outputs = Array.from(midiAccess.outputs.values())
+  const inputs  = Array.from(midiAccess.inputs.values())
+
+  if (outputs.length === 0 && inputs.length === 0) {
+    portList.innerHTML = '<li style="justify-content:center"><span class="port-name">No MIDI ports found</span></li>'
+    return
+  }
+
+  // Build a unified list by name
+  const names = new Set([
+    ...outputs.map(p => p.name),
+    ...inputs.map(p => p.name),
+  ])
+
+  for (const name of names) {
+    const out = outputs.find(p => p.name === name)
+    const inp = inputs.find(p => p.name === name)
+    const li  = document.createElement('li')
+    const isActive = (selectedOutput && selectedOutput.name === name) ||
+                     (selectedInput  && selectedInput.name  === name)
+    if (isActive) li.classList.add('active')
+
+    li.innerHTML = `<span class="port-name" title="${name}">${name}</span>`
+
+    if (out) {
+      const btn = document.createElement('button')
+      btn.className = 'sm'
+      btn.textContent = 'OUT'
+      btn.title = 'Select as output'
+      btn.addEventListener('click', () => selectOutput(out))
+      li.appendChild(btn)
+    }
+    if (inp) {
+      const btn = document.createElement('button')
+      btn.className = 'sm'
+      btn.textContent = 'IN'
+      btn.title = 'Select as input'
+      btn.addEventListener('click', () => selectInput(inp))
+      li.appendChild(btn)
+    }
+    if (out && inp) {
+      const btn = document.createElement('button')
+      btn.className = 'sm primary'
+      btn.textContent = 'Both'
+      btn.title = 'Select as both input and output'
+      btn.addEventListener('click', () => { selectOutput(out); selectInput(inp) })
+      li.appendChild(btn)
+    }
+    portList.appendChild(li)
+  }
+}
+
+function selectOutput(port) {
+  selectedOutput = port
+  activeOut.textContent = 'OUT: ' + port.name
+  activeOut.className = 'conn-status ok'
+  refreshPorts()
+}
+
+function selectInput(port) {
+  if (selectedInput) selectedInput.onmidimessage = null
+  selectedInput = port
+  port.onmidimessage = handleMidiMessage
+  activeIn.textContent = 'IN: ' + port.name
+  activeIn.className = 'conn-status ok'
+  refreshPorts()
+}
+
+function setConnStatus(msg, cls) {
+  connStatus.textContent = msg
+  connStatus.className = 'conn-status' + (cls ? ' ' + cls : '')
+}
+
+// ── MIDI IN handler ────────────────────────────────────────────────────────
+function handleMidiMessage(event) {
+  const d = event.data
+  if (!d || d.length === 0) return
+
+  const now    = new Date()
+  const ts     = now.toLocaleTimeString('en', { hour12: false }) +
+                 '.' + String(now.getMilliseconds()).padStart(3, '0')
+  const status = d[0]
+  const type   = status & 0xF0
+  const ch     = (status & 0x0F) + 1
+
+  // Clock & transport (no channel)
+  if (status === 0xF8) return // suppress clock (very frequent)
+  if (status === 0xFA || status === 0xFB || status === 0xFC) {
+    const names = { 0xFA: 'START', 0xFB: 'CONTINUE', 0xFC: 'STOP' }
+    appendLog(ts, names[status], '', 'transport msg', 'log-clock')
+    return
+  }
+
+  // SysEx
+  if (status === 0xF0) {
+    const hex = Array.from(d).map(b => b.toString(16).toUpperCase().padStart(2,'0')).join(' ')
+    appendLog(ts, 'SYSEX', '', hex, 'log-sysex')
+    return
+  }
+
+  const noteNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
+  const noteName  = (n) => noteNames[n % 12] + Math.floor(n / 12 - 1)
+
+  if (type === 0x90 && d[2] > 0) {
+    appendLog(ts, 'NOTE ON',  `ch${ch}`, `note ${d[1]} (${noteName(d[1])})  vel ${d[2]}`, 'log-noteon')
+  } else if (type === 0x80 || (type === 0x90 && d[2] === 0)) {
+    appendLog(ts, 'NOTE OFF', `ch${ch}`, `note ${d[1]} (${noteName(d[1])})`, 'log-noteoff')
+  } else if (type === 0xB0) {
+    appendLog(ts, 'CC',       `ch${ch}`, `CC ${d[1]}  val ${d[2]}`, 'log-cc')
+  } else {
+    const hex = Array.from(d).map(b => b.toString(16).toUpperCase().padStart(2,'0')).join(' ')
+    appendLog(ts, 'MSG', `ch${ch}`, hex, 'log-other')
+  }
+}
+
+function appendLog(ts, type, ch, data, cls) {
+  const e = document.createElement('div')
+  e.className = 'log-entry ' + (cls || 'log-other')
+  e.innerHTML = `<span class="log-ts">${ts}</span><span class="log-type">${type}</span><span class="log-ch">${ch}</span><span class="log-data">${escHtml(data)}</span>`
+  midiLog.appendChild(e)
+  // Keep last 500 entries
+  while (midiLog.children.length > 500) midiLog.removeChild(midiLog.firstChild)
+  midiLog.scrollTop = midiLog.scrollHeight
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+// ── Send helpers ───────────────────────────────────────────────────────────
+function requireOutput(statusEl) {
+  if (!selectedOutput) {
+    setStatus(statusEl, 'No output port selected', true)
+    return false
+  }
+  return true
+}
+
+function setStatus(el, msg, isErr, timeout = 2000) {
+  if (!el) return
+  el.textContent = msg
+  el.className = 'send-status' + (isErr ? ' err' : '')
+  if (timeout) setTimeout(() => { el.textContent = '' }, timeout)
+}
+
+function sendBytes(bytes) {
+  try {
+    selectedOutput.send(bytes)
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+// ── CC ─────────────────────────────────────────────────────────────────────
+document.getElementById('btnSendCC').addEventListener('click', () => {
+  const el = document.getElementById('ccStatus')
+  if (!requireOutput(el)) return
+  const ch  = clamp(+document.getElementById('ccCh').value,  1, 16)
+  const num = clamp(+document.getElementById('ccNum').value, 0, 127)
+  const val = clamp(+document.getElementById('ccVal').value, 0, 127)
+  const ok  = sendBytes([0xB0 | (ch - 1), num, val])
+  setStatus(el, ok ? `Sent CC ${num} = ${val} on ch${ch}` : 'Send failed', !ok)
+})
+
+// ── Note On / Off ──────────────────────────────────────────────────────────
+document.getElementById('btnNoteOn').addEventListener('click', () => {
+  const el  = document.getElementById('noteStatus')
+  if (!requireOutput(el)) return
+  const ch  = clamp(+document.getElementById('noteCh').value,  1, 16)
+  const num = clamp(+document.getElementById('noteNum').value, 0, 127)
+  const vel = clamp(+document.getElementById('noteVel').value, 1, 127)
+  const ok  = sendBytes([0x90 | (ch - 1), num, vel])
+  setStatus(el, ok ? `Note On: ${num} vel ${vel} ch${ch}` : 'Send failed', !ok)
+})
+
+document.getElementById('btnNoteOff').addEventListener('click', () => {
+  const el  = document.getElementById('noteStatus')
+  if (!requireOutput(el)) return
+  const ch  = clamp(+document.getElementById('noteCh').value,  1, 16)
+  const num = clamp(+document.getElementById('noteNum').value, 0, 127)
+  const ok  = sendBytes([0x80 | (ch - 1), num, 0])
+  setStatus(el, ok ? `Note Off: ${num} ch${ch}` : 'Send failed', !ok)
+})
+
+// ── NRPN ───────────────────────────────────────────────────────────────────
+document.getElementById('btnSendNRPN').addEventListener('click', () => {
+  const el  = document.getElementById('nrpnStatus')
+  if (!requireOutput(el)) return
+  const ch  = clamp(+document.getElementById('nrpnCh').value,  1, 16)
+  const msb = clamp(+document.getElementById('nrpnMsb').value, 0, 127)
+  const lsb = clamp(+document.getElementById('nrpnLsb').value, 0, 127)
+  const val = clamp(+document.getElementById('nrpnVal').value, 0, 16383)
+  const c   = ch - 1
+  const vMsb = (val >> 7) & 0x7F
+  const vLsb = val & 0x7F
+  const ok = sendBytes([0xB0|c, 99, msb, 0xB0|c, 98, lsb, 0xB0|c, 6, vMsb, 0xB0|c, 38, vLsb])
+  setStatus(el, ok ? `NRPN ${msb}:${lsb} = ${val} ch${ch}` : 'Send failed', !ok)
+})
+
+// ── Transport ──────────────────────────────────────────────────────────────
+document.getElementById('btnStart').addEventListener('click', () => {
+  const el = document.getElementById('transportStatus')
+  if (!requireOutput(el)) return
+  const ok = sendBytes([0xFA])
+  setStatus(el, ok ? 'Sent: Start' : 'Send failed', !ok)
+})
+document.getElementById('btnStop').addEventListener('click', () => {
+  const el = document.getElementById('transportStatus')
+  if (!requireOutput(el)) return
+  const ok = sendBytes([0xFC])
+  setStatus(el, ok ? 'Sent: Stop' : 'Send failed', !ok)
+})
+document.getElementById('btnContinue').addEventListener('click', () => {
+  const el = document.getElementById('transportStatus')
+  if (!requireOutput(el)) return
+  const ok = sendBytes([0xFB])
+  setStatus(el, ok ? 'Sent: Continue' : 'Send failed', !ok)
+})
+document.getElementById('btnClock').addEventListener('click', () => {
+  const el = document.getElementById('transportStatus')
+  if (!requireOutput(el)) return
+  const ok = sendBytes([0xF8])
+  setStatus(el, ok ? 'Sent: Clock tick' : 'Send failed', !ok)
+})
+
+// ── SysEx ──────────────────────────────────────────────────────────────────
+document.getElementById('btnSendSysEx').addEventListener('click', () => {
+  const el = document.getElementById('sysexStatus')
+  if (!requireOutput(el)) return
+  const raw = document.getElementById('sysexInput').value.trim()
+  const bytes = parseSysExHex(raw)
+  if (!bytes) {
+    setStatus(el, 'Invalid hex — must start with F0 and end with F7', true)
+    return
+  }
+  const ok = sendBytes(bytes)
+  setStatus(el, ok ? `Sent ${bytes.length} bytes` : 'Send failed', !ok)
+})
+
+function parseSysExHex(str) {
+  const tokens = str.replace(/[,;]/g, ' ').trim().split(/\s+/)
+  if (!tokens.length) return null
+  try {
+    const bytes = tokens.map(t => {
+      const n = parseInt(t, 16)
+      if (isNaN(n) || n < 0 || n > 255) throw new Error('bad byte: ' + t)
+      return n
+    })
+    if (bytes[0] !== 0xF0 || bytes[bytes.length - 1] !== 0xF7) return null
+    return bytes
+  } catch { return null }
+}
+
+// ── Quick Tests ────────────────────────────────────────────────────────────
+const QT_SYSEX = {
+  reqPatchSyn1: [0xF0, 0x00, 0x20, 0x29, 0x01, 0x64, 0x63, 0x00, 0xF7],
+  reqPatchSyn2: [0xF0, 0x00, 0x20, 0x29, 0x01, 0x64, 0x63, 0x01, 0xF7],
+  midiIdentity: [0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7],
+}
+
+document.getElementById('quickGrid').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-qt]')
+  if (!btn) return
+  const el  = document.getElementById('qtStatus')
+  if (!requireOutput(el)) return
+  const qt  = btn.dataset.qt
+
+  // SysEx quick tests
+  if (QT_SYSEX[qt]) {
+    const ok = sendBytes(QT_SYSEX[qt])
+    setStatus(el, ok ? `Sent: ${btn.textContent.trim()}` : 'Send failed', !ok)
+    return
+  }
+
+  switch (qt) {
+    case 'filterCutoff64': {
+      const ok = sendBytes([0xB0, 74, 64])
+      setStatus(el, ok ? 'Filter Cutoff CC74=64 sent on ch1' : 'Send failed', !ok)
+      break
+    }
+    case 'macroSweep': {
+      setStatus(el, 'Sweeping macros CC80–87…', false, 0)
+      for (let cc = 80; cc <= 87; cc++) {
+        sendBytes([0xB0, cc, 127])
+        await delay(50)
+      }
+      await delay(200)
+      for (let cc = 80; cc <= 87; cc++) {
+        sendBytes([0xB0, cc, 0])
+        await delay(50)
+      }
+      setStatus(el, 'Macro sweep done', false)
+      break
+    }
+    case 'panCenter': {
+      const chs = [0, 1, 5, 6, 7, 8] // ch 1,2,6,7,8,9 (0-indexed)
+      chs.forEach(c => sendBytes([0xB0 | c, 10, 64]))
+      setStatus(el, `Pan=64 sent on ch 1,2,6,7,8,9`, false)
+      break
+    }
+    case 'reverbSend64': {
+      const ok = sendBytes([0xB0, 91, 64])
+      setStatus(el, ok ? 'Reverb send CC91=64 on ch1' : 'Send failed', !ok)
+      break
+    }
+    case 'allNotesOff': {
+      for (let c = 0; c < 6; c++) sendBytes([0xB0 | c, 123, 0])
+      setStatus(el, 'All Notes Off sent on ch1–6', false)
+      break
+    }
+  }
+})
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)) }
+function delay(ms) { return new Promise(r => setTimeout(r, ms)) }
+</script>
+</body>
+</html>
