@@ -36,11 +36,15 @@ midiOn('sysex',    flashMidiIn)
 midiOn('noteon',   flashMidiIn)
 
 // ── WebSocket connection ───────────────────────────────────────────────────────
+const WS_URL = import.meta.env.VITE_WS_URL ?? (() => {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+  return `${proto}://${location.host}/ws`
+})()
+
 function connect() {
   if (ws && ws.readyState < 2) return  // already open or connecting
 
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-  ws = new WebSocket(`${proto}://${location.host}/ws`)
+  ws = new WebSocket(WS_URL)
 
   ws.addEventListener('message', (ev) => {
     let msg
