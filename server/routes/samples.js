@@ -79,9 +79,31 @@ router.get('/:index/audio', (req, res) => {
   }
   const ext = extname(sample.filename).toLowerCase()
   const contentTypes = { '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.aiff': 'audio/aiff', '.aif': 'audio/aiff' }
-  res.setHeader('Content-Type', contentTypes[ext] || 'audio/octet-stream')
+  const contentType = contentTypes[ext] || 'audio/octet-stream'
+  const totalSize = statSync(filePath).size
+
+  res.setHeader('Content-Type', contentType)
+  res.setHeader('Accept-Ranges', 'bytes')
   res.setHeader('Content-Disposition', `inline; filename="${sample.name}${ext}"`)
-  createReadStream(filePath).pipe(res)
+
+  const rangeHeader = req.headers.range
+  if (rangeHeader) {
+    // Parse "bytes=start-end"
+    const [startStr, endStr] = rangeHeader.replace(/bytes=/, '').split('-')
+    const start = parseInt(startStr, 10)
+    const end   = endStr ? parseInt(endStr, 10) : totalSize - 1
+    if (start >= totalSize || end >= totalSize || start > end) {
+      res.setHeader('Content-Range', `bytes */${totalSize}`)
+      return res.status(416).end()
+    }
+    res.status(206)
+    res.setHeader('Content-Range',  `bytes ${start}-${end}/${totalSize}`)
+    res.setHeader('Content-Length', end - start + 1)
+    createReadStream(filePath, { start, end }).pipe(res)
+  } else {
+    res.setHeader('Content-Length', totalSize)
+    createReadStream(filePath).pipe(res)
+  }
 })
 
 router.get('/:index/download', (req, res) => {

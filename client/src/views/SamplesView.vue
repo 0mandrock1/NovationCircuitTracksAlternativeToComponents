@@ -1,8 +1,11 @@
 <script setup>
+import { onMounted } from 'vue'
 import { useSamplesStore } from '@/stores/samples'
 import SampleList from '@/components/samples/SampleList.vue'
 
 const store = useSamplesStore()
+
+onMounted(() => store.loadFromServer())
 
 function onZoneDrop(e) {
   const files = Array.from(e.dataTransfer.files).filter(f =>

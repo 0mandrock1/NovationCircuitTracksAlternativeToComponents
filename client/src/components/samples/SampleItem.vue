@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useSamplesStore } from '@/stores/samples'
 
 const props = defineProps({
@@ -13,6 +13,11 @@ const renaming = ref(false)
 const newName  = ref('')
 const playing  = ref(false)
 let audioEl = null
+
+// Local Object URL takes priority; fall back to streaming from server if slot has a filename
+const previewUrl = computed(() =>
+  props.sample.audioUrl ?? (props.sample.filename ? `/api/samples/${props.index}/audio` : null)
+)
 
 function startRename() {
   newName.value  = props.sample.name
@@ -30,15 +35,14 @@ function onRenameKey(e) {
 }
 
 function playPreview() {
-  // Use the locally stored Object URL (no server needed)
-  if (!props.sample.audioUrl) return
+  if (!previewUrl.value) return
   if (playing.value && audioEl) {
     audioEl.pause()
     audioEl.currentTime = 0
     playing.value = false
     return
   }
-  audioEl = new Audio(props.sample.audioUrl)
+  audioEl = new Audio(previewUrl.value)
   audioEl.onended = () => { playing.value = false }
   audioEl.onerror = () => { playing.value = false }
   audioEl.play()
@@ -107,13 +111,13 @@ function deleteSample() {
     </span>
 
     <div class="sample-item__actions">
-      <!-- Play preview (local) -->
+      <!-- Play preview (local or server stream) -->
       <button
         class="sample-item__btn"
         :class="{ 'sample-item__btn--active': playing }"
-        :disabled="!sample.audioUrl"
+        :disabled="!previewUrl"
         @click="playPreview"
-        title="Preview (local)"
+        :title="sample.audioUrl ? 'Preview (local)' : sample.filename ? 'Preview (server stream)' : 'No audio loaded'"
       >▶</button>
 
       <!-- Load file (local) -->

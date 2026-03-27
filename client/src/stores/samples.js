@@ -52,5 +52,25 @@ export const useSamplesStore = defineStore('samples', () => {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  return { samples, loading, loadFile, renameSample, deleteSample, exportSample }
+  /** Fetch sample list from server and populate slots that have server-side files. */
+  async function loadFromServer() {
+    try {
+      const res  = await fetch('/api/samples')
+      if (!res.ok) return
+      const { samples: list } = await res.json()
+      for (const s of list) {
+        if (s.index >= 0 && s.index < 64 && s.filename) {
+          // Only update slots that are not already populated with a local file
+          const slot = samples.value[s.index]
+          if (!slot.audioUrl) {
+            slot.name     = s.name
+            slot.filename = s.filename
+            slot.size     = s.size
+          }
+        }
+      }
+    } catch { /* server unavailable */ }
+  }
+
+  return { samples, loading, loadFile, renameSample, deleteSample, exportSample, loadFromServer }
 })

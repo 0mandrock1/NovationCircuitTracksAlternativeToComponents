@@ -7,6 +7,7 @@ import SynthEditor    from '@/components/patches/SynthEditor.vue'
 import MacroEditor    from '@/components/patches/MacroEditor.vue'
 import EffectsEditor  from '@/components/patches/EffectsEditor.vue'
 import ModMatrix      from '@/components/patches/ModMatrix.vue'
+import MiniKeyboard   from '@/components/ui/MiniKeyboard.vue'
 
 const store  = usePatchesStore()
 const device = useDeviceStore()
@@ -146,6 +147,9 @@ const activeProgress = computed(() =>
         </template>
         <div v-else class="patches-view__empty">Select a patch from the list.</div>
       </div>
+
+      <!-- Mini keyboard for patch preview (sends NoteOn/Off to device) -->
+      <MiniKeyboard />
     </div>
   </div>
 </template>
