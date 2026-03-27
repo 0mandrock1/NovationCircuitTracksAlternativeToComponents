@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Circuit Tracks Web UI — Manual Test Checklist</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 11px;
+    color: #1a1a2e;
+    background: #fff;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* ── Cover ─────────────────────────────────────────── */
+  .cover {
+    text-align: center;
+    padding: 40px 20px 32px;
+    border-bottom: 3px solid #6c63ff;
+    margin-bottom: 24px;
+    page-break-after: avoid;
+  }
+  .cover h1 { font-size: 26px; font-weight: 800; margin: 0 0 6px; color: #1a1a2e; }
+  .cover .subtitle { font-size: 14px; color: #555; margin: 0 0 20px; }
+  .cover .meta { font-size: 10px; color: #888; }
+  .cover .meta span { margin: 0 10px; }
+
+  /* ── Section headings ───────────────────────────────── */
+  h2 {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #fff;
+    background: #6c63ff;
+    padding: 5px 10px;
+    margin: 20px 0 6px;
+    border-radius: 3px;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-size: 11px;
+    font-weight: 700;
+    color: #3d3a6e;
+    margin: 12px 0 4px;
+    padding-left: 4px;
+    border-left: 3px solid #6c63ff;
+    page-break-after: avoid;
+  }
+
+  /* ── Test items ─────────────────────────────────────── */
+  .test-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 6px 4px 2px;
+    border-bottom: 1px solid #eee;
+    page-break-inside: avoid;
+  }
+  .test-item:last-child { border-bottom: none; }
+
+  .cb {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid #999;
+    border-radius: 2px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .test-body { flex: 1; }
+
+  .test-title {
+    font-weight: 600;
+    font-size: 11px;
+    color: #1a1a2e;
+    line-height: 1.4;
+  }
+
+  .test-steps {
+    font-size: 10px;
+    color: #444;
+    margin: 2px 0 0 2px;
+    line-height: 1.6;
+  }
+
+  .test-steps ol, .test-steps ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .expected {
+    display: inline-block;
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+    border-radius: 2px;
+    padding: 1px 5px;
+    font-size: 9.5px;
+    color: #2e7d32;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  .warn {
+    display: inline-block;
+    background: #fff3e0;
+    border: 1px solid #ffcc80;
+    border-radius: 2px;
+    padding: 1px 5px;
+    font-size: 9.5px;
+    color: #e65100;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  .code {
+    font-family: 'Consolas', 'Courier New', monospace;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 2px;
+    padding: 0 3px;
+    font-size: 9px;
+  }
+
+  .result-box {
+    margin-top: 3px;
+    border: 1px dashed #ccc;
+    border-radius: 2px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    font-size: 9px;
+    color: #aaa;
+  }
+  .result-box::before { content: 'Notes: '; }
+
+  /* ── Status badge ────────────────────────────────────── */
+  .badge {
+    display: inline-block;
+    font-size: 8.5px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 10px;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+  .badge-midi   { background: #e3f2fd; color: #1565c0; }
+  .badge-sysex  { background: #fce4ec; color: #b71c1c; }
+  .badge-ws     { background: #f3e5f5; color: #6a1b9a; }
+  .badge-ui     { background: #e8f5e9; color: #1b5e20; }
+  .badge-server { background: #fff3e0; color: #bf360c; }
+
+  /* ── Info callout ────────────────────────────────────── */
+  .callout {
+    background: #f0f4ff;
+    border-left: 4px solid #6c63ff;
+    border-radius: 2px;
+    padding: 6px 10px;
+    margin: 6px 0 8px;
+    font-size: 10px;
+    color: #333;
+    line-height: 1.5;
+  }
+
+  .callout strong { color: #6c63ff; }
+
+  /* ── Summary table ───────────────────────────────────── */
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+    margin-top: 6px;
+  }
+  .summary-table th {
+    background: #6c63ff;
+    color: #fff;
+    padding: 4px 8px;
+    text-align: left;
+    font-weight: 700;
+  }
+  .summary-table td {
+    padding: 3px 8px;
+    border-bottom: 1px solid #eee;
+  }
+  .summary-table tr:last-child td { border-bottom: none; }
+  .summary-table td:first-child { font-weight: 600; }
+
+  /* ── Known limitations ───────────────────────────────── */
+  .limitation {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    padding: 4px 0;
+    font-size: 10px;
+    color: #555;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .limitation::before {
+    content: '⚠';
+    color: #ff9800;
+    flex-shrink: 0;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  /* ── Print helpers ───────────────────────────────────── */
+  @media print {
+    body { padding: 0; max-width: 100%; font-size: 10px; }
+    .no-print { display: none !important; }
+    h2 { color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .expected, .warn { color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .badge { color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .callout { color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
+
+  /* ── Print button ─────────────────────────────────────── */
+  .print-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    background: #6c63ff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(108,99,255,0.4);
+    z-index: 9999;
+  }
+  .print-btn:hover { background: #5a52e0; }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">🖨 Print / Save PDF</button>
+
+<!-- ── Cover ─────────────────────────────────────────────────── -->
+<div class="cover">
+  <h1>Circuit Tracks Web UI</h1>
+  <div class="subtitle">Manual Acceptance Test Checklist</div>
+  <div class="meta">
+    <span>Tester: _________________________</span>
+    <span>Date: _________________________</span>
+    <span>Build: _________________________</span>
+  </div>
+</div>
+
+<!-- ── Prerequisites ─────────────────────────────────────────── -->
+<h2>0 — Prerequisites</h2>
+
+<div class="callout">
+  <strong>Before starting:</strong> Run <span class="code">npm run dev</span> (client on :5173, server on :3000).
+  Connect Circuit Tracks via USB. Open <strong>http://localhost:5173</strong> in Chrome or Edge.
+  Keep browser DevTools → Console open to catch JS errors throughout.
+</div>
+
+<table class="summary-table">
+  <tr><th>Item</th><th>Value / Check</th></tr>
+  <tr><td>Browser</td><td>Chrome ≥ 114  or  Edge ≥ 114 (Web MIDI required)</td></tr>
+  <tr><td>Circuit Tracks firmware</td><td>v3.x (visible on device after power-on)</td></tr>
+  <tr><td>USB cable</td><td>Type-B (printer cable) — data cable, not charge-only</td></tr>
+  <tr><td>Server running</td><td>Terminal shows "Circuit Tracks server running on http://localhost:3000"</td></tr>
+  <tr><td>No JS errors on load</td><td>DevTools console shows 0 errors on blank load</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>1 — Device Tab (connection, global settings)</h2>
+
+<h3>1.1 Initial MIDI enable</h3>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Browser MIDI permission dialog <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Navigate to <strong>Device</strong> tab</li>
+      <li>Click <strong>Enable MIDI</strong></li>
+      <li>Chrome shows permission popup → click <em>Allow</em>, tick <em>Allow SysEx</em></li>
+    </ol></div>
+    <div class="expected">✓ Port list appears. No "MIDI access denied" error.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Port detection <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Port list should contain "Circuit Tracks MIDI 1" (and optionally MIDI 2)</li>
+      <li>Click <strong>Connect</strong> next to "Circuit Tracks MIDI 1"</li>
+    </ol></div>
+    <div class="expected">✓ Status dot turns green. Port name shown. Status bar shows "Connected".</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Disconnect / Reconnect <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click <strong>Disconnect</strong></li>
+      <li>Unplug USB cable, wait 2 s, replug</li>
+      <li>Click <strong>Refresh Ports</strong></li>
+      <li>Reconnect</li>
+    </ol></div>
+    <div class="expected">✓ After reconnect dot is green again. Auto-reconnect (no page reload).</div>
+  </div>
+</div>
+
+<h3>1.2 Global settings</h3>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Tempo apply <span class="badge badge-server">SERVER</span></div>
+    <div class="test-steps"><ol>
+      <li>Type <strong>140</strong> in Tempo field</li>
+      <li>Click <strong>Apply</strong></li>
+    </ol></div>
+    <div class="expected">✓ Status message: "Tempo set to 140 BPM". No error toast. Server log shows sendCC(0x51).</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Swing apply <span class="badge badge-server">SERVER</span></div>
+    <div class="test-steps"><ol>
+      <li>Move Swing slider to 50</li>
+      <li>Click <strong>Apply</strong></li>
+    </ol></div>
+    <div class="expected">✓ Status "Swing set to 50%". Device receives CC 0x52.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Transpose apply <span class="badge badge-server">SERVER</span></div>
+    <div class="test-steps"><ol>
+      <li>Enter <strong>-5</strong> in Transpose</li>
+      <li>Click <strong>Apply</strong></li>
+    </ol></div>
+    <div class="expected">✓ Status "Transpose set to -5". CC 0x53 sent.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Tempo boundary — out-of-range input <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Enter <strong>999</strong> in Tempo → Apply</li>
+      <li>Enter <strong>0</strong> in Tempo → Apply</li>
+    </ol></div>
+    <div class="expected">✓ HTML number input clamps to min/max (40–240). No crash.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Apply error when disconnected <span class="badge badge-server">SERVER</span></div>
+    <div class="test-steps"><ol>
+      <li>Stop the Node.js server (<span class="code">Ctrl+C</span>)</li>
+      <li>Click <strong>Apply</strong> on any global setting</li>
+      <li>Restart the server</li>
+    </ol></div>
+    <div class="expected">✓ Status shows "connection error" in red. No crash.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>2 — Patches Tab</h2>
+
+<div class="callout">
+  <strong>Test path A:</strong> Synth 1 (default). Then repeat critical steps for <strong>Synth 2</strong>
+  to verify bank routing is correct. Confirm the status bar shows which track is active.
+</div>
+
+<h3>2.1 Patch list</h3>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Fetch single patch from device <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Select <strong>Synth 1</strong> track in the patch panel</li>
+      <li>Click <strong>Fetch from Device</strong> on patch slot 1</li>
+    </ol></div>
+    <div class="expected">✓ Patch name updates to device's actual name. Spinner visible during request. No timeout error.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Fetch all (Synth 1) <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Click <strong>Fetch All from Device</strong></li>
+      <li>Watch progress counter</li>
+    </ol></div>
+    <div class="expected">✓ All 64 names populated with device patch names. Progress reaches 64/64. No blank names.</div>
+    <div class="result-box"></div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Fetch all — Synth 2 uses correct bank <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Switch to <strong>Synth 2</strong> tab</li>
+      <li>Click <strong>Fetch All from Device</strong></li>
+      <li>Compare names with Synth 1 list</li>
+    </ol></div>
+    <div class="expected">✓ Synth 2 shows different patch names than Synth 1 (different banks). If identical, bank selector bug is present.</div>
+    <div class="result-box"></div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Audition patch on device <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Click any patch in the list</li>
+      <li>Listen to the sound on the device</li>
+    </ol></div>
+    <div class="expected">✓ Sound changes on Circuit Tracks. MIDI OUT indicator flashes. No SysEx error in console.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Rename patch <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Double-click a patch name (or use rename button)</li>
+      <li>Type a new name (max 16 chars)</li>
+      <li>Press Enter</li>
+    </ol></div>
+    <div class="expected">✓ New name persists in the list. Long names truncated to 16 chars.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Export single patch as .syx <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Right-click (or use menu) on a loaded patch → <strong>Export .syx</strong></li>
+    </ol></div>
+    <div class="expected">✓ Browser downloads a file named <span class="code">&lt;name&gt;.syx</span>. File is non-zero bytes.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Export full bank .syx <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click <strong>Export Bank .syx</strong></li>
+    </ol></div>
+    <div class="expected">✓ Downloads <span class="code">circuit_tracks_synth1_bank.syx</span> (or synth2). Size > 0.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Import .syx (single patch) <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Click <strong>Import .syx</strong></li>
+      <li>Select the .syx file exported in the previous test</li>
+    </ol></div>
+    <div class="expected">✓ Toast "Imported 1 patch". Patch name appears in list. <strong>Synth Editor opens with correct knob positions (not all-zero)</strong>.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Import .syx (bank of 64) <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Import the bank file from previous export</li>
+    </ol></div>
+    <div class="expected">✓ Toast "Imported 64 patches". All names update.</div>
+  </div>
+</div>
+
+<h3>2.2 Synth Editor</h3>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Knob drag updates value + sends SysEx <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Click a patch with data → Synth sub-tab</li>
+      <li>Drag the <strong>Cutoff</strong> knob up/down</li>
+      <li>Hold drag for 1 second (debounce window)</li>
+    </ol></div>
+    <div class="expected">✓ Knob value changes. ~30ms after release: MIDI OUT indicator flashes. Device sound changes.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Multiple rapid knob changes — only one SysEx sent <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Rapidly drag Cutoff knob back and forth 10×</li>
+      <li>Watch MIDI OUT indicator</li>
+    </ol></div>
+    <div class="expected">✓ MIDI OUT flashes once (or very few times), not 10×. Debounce is working.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Filter type toggle <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click LP24 / HP12 / BP12 etc. filter type buttons</li>
+    </ol></div>
+    <div class="expected">✓ Active button highlighted. SysEx sent. Device filter type changes audibly.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Waveform selection <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click different waveform shapes (Sine, Saw, Square, Triangle) for OSC A and B</li>
+    </ol></div>
+    <div class="expected">✓ Button highlights update. SysEx triggers. Sound character changes on device.</div>
+  </div>
+</div>
+
+<h3>2.3 Effects Editor</h3>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Distortion enable/disable <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Click Effects sub-tab</li>
+      <li>Toggle the Distortion enable switch</li>
+      <li>Turn Amount knob to 127</li>
+    </ol></div>
+    <div class="expected">✓ Distortion audible when enabled. Amount changes tone.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Distortion type NRPN <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click each distortion type button (Saturate, Clip, Fold, etc.)</li>
+    </ol></div>
+    <div class="expected">✓ MIDI OUT flashes for each click. Distortion character changes on device. <span class="warn">⚠ Type resets to first on page reload (known limitation).</span></div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Reverb/Delay send knobs <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Drag Reverb Send and Delay Send knobs</li>
+    </ol></div>
+    <div class="expected">✓ SysEx triggers. Reverb tail / delay echo audible on device.</div>
+  </div>
+</div>
+
+<h3>2.4 Modulation Matrix</h3>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Add modulation slot <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click Modulation sub-tab</li>
+      <li>Select source "LFO 1" in an empty slot</li>
+      <li>Select destination "Cutoff"</li>
+      <li>Set depth to 50</li>
+    </ol></div>
+    <div class="expected">✓ Slot populates. SysEx sent. Cutoff modulates with LFO on device.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>3 — Samples Tab</h2>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Load WAV file into slot <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click the upload button (↑) on sample slot 1</li>
+      <li>Choose a WAV file</li>
+    </ol></div>
+    <div class="expected">✓ Filename and size appear in the row. Preview button (▶) enables.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Preview playback <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click ▶ on a loaded sample</li>
+      <li>Click again to stop</li>
+    </ol></div>
+    <div class="expected">✓ Audio plays in browser. Button highlights while playing. Stop works.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Drag-and-drop file <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Drag a WAV/MP3 file from the OS onto any sample slot</li>
+    </ol></div>
+    <div class="expected">✓ File loads. Name and size update. Preview enabled.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Rename sample <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click the rename button (✎)</li>
+      <li>Type new name (max 16 chars) → Enter</li>
+    </ol></div>
+    <div class="expected">✓ Name updates in list. Long names truncated to 16 chars.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Export / download local copy <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click ↓ on a loaded sample</li>
+    </ol></div>
+    <div class="expected">✓ Browser downloads the audio file.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Delete sample slot <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click ✕ on a loaded sample</li>
+    </ol></div>
+    <div class="expected">✓ Slot resets to "Sample N". Preview disabled. Size shows "—".</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Send to device (expected failure) <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click → (send to device) on any slot</li>
+    </ol></div>
+    <div class="expected">✓ Alert shows "not available via MIDI" message. No crash.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Server-side ffmpeg conversion <span class="badge badge-server">SERVER</span></div>
+    <div class="test-steps"><ol>
+      <li>Upload an MP3 file</li>
+      <li>Check server terminal for ffmpeg output</li>
+      <li>Check <span class="code">data/samples/</span> folder for converted WAV</li>
+    </ol></div>
+    <div class="expected">✓ Server shows "ffmpeg" command. <span class="code">sample_N.wav</span> appears in data/samples/. File is mono 48kHz WAV.</div>
+    <div class="warn">⚠ If ffmpeg not installed: server logs "ffmpeg not found", original file stored as-is.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>4 — Sequencer Tab</h2>
+
+<div class="callout">
+  <strong>Clock source:</strong> Steps highlight when the device sends MIDI Clock (0xF8 at 24 PPQN).
+  Click Play from the app, or press Play on the device itself.
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Step grid renders 8 tracks × 16/32 steps <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Navigate to Sequencer tab</li>
+      <li>Switch between 16-step and 32-step modes</li>
+    </ol></div>
+    <div class="expected">✓ Grid shows correct number of columns. Track names displayed on left.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Toggle steps on/off <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click cells in the Drum 1 row to enable steps</li>
+      <li>Click again to disable</li>
+    </ol></div>
+    <div class="expected">✓ Active steps shown with highlight color. Click again clears them.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Transport: Play <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Enable some steps in Drum rows</li>
+      <li>Click ▶ (Play)</li>
+    </ol></div>
+    <div class="expected">✓ MIDI Start (0xFA) sent. Device starts playing. Step highlights advance in sync. Drum notes trigger via MIDI NoteOn.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Transport: Stop <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click ■ (Stop) while playing</li>
+    </ol></div>
+    <div class="expected">✓ Device stops. Step highlight resets to -1 (no highlight). No stuck notes.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Step highlight sync with MIDI clock <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Press Play on the Circuit Tracks hardware directly</li>
+      <li>Watch step highlight in the browser</li>
+    </ol></div>
+    <div class="expected">✓ Browser step highlight matches device playhead. Tempo synced.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Track mute <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Enable steps in Drum 1 and Drum 2 rows</li>
+      <li>Press Play</li>
+      <li>Click Mute on Drum 1</li>
+    </ol></div>
+    <div class="expected">✓ Drum 1 stops triggering NoteOn. Drum 2 continues.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Pattern switch <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Edit Pattern 1 with some steps</li>
+      <li>Switch to Pattern 2 (empty)</li>
+      <li>Switch back to Pattern 1</li>
+    </ol></div>
+    <div class="expected">✓ Pattern 1 state preserved. Pattern 2 is empty.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>5 — Mixer Tab</h2>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Volume fader sends CC <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Navigate to Mixer tab</li>
+      <li>Drag Synth 1 volume fader up and down</li>
+    </ol></div>
+    <div class="expected">✓ MIDI OUT indicator flashes. Device Synth 1 volume changes.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Pan control <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Drag pan knob for any drum channel to full left, full right, center</li>
+    </ol></div>
+    <div class="expected">✓ CC 10 sent on correct channel. Stereo field shifts on device.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Mute button <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click Mute on Synth 1</li>
+      <li>Click again to unmute</li>
+    </ol></div>
+    <div class="expected">✓ Mute button visually toggles. (Note: Mute is UI-only — Circuit Tracks has no remote mute CC.)</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Macro knobs reflect device input <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Turn any of the 8 macro knobs on the Circuit Tracks hardware</li>
+    </ol></div>
+    <div class="expected">✓ MIDI IN flashes. Macro knob display in Mixer updates to new value (CC 80–87).</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Sync to device on connect <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Set Drum 1 volume to 30</li>
+      <li>Disconnect USB cable and reconnect</li>
+    </ol></div>
+    <div class="expected">✓ After reconnect, mixer state is re-sent to device automatically (volume stays at 30 on device side).</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>6 — MIDI Settings Tab</h2>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">MIDI templates display <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Navigate to MIDI Settings tab</li>
+    </ol></div>
+    <div class="expected">✓ 8 template slots shown. Default CC numbers (1,2,5,11,12,13,71,74) pre-filled.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Edit template CC number <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Change Macro 1 CC from 1 to 25</li>
+      <li>Switch template → switch back</li>
+    </ol></div>
+    <div class="expected">✓ Value persists per template. Input validates 0–127.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Track MIDI routing <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Change MIDI Track 1 channel from default to channel 5</li>
+    </ol></div>
+    <div class="expected">✓ Channel selector saves. Range 1–15 (channel 16 reserved).</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>7 — Sessions Tab</h2>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Project grid renders 64 slots <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Navigate to Sessions tab</li>
+    </ol></div>
+    <div class="expected">✓ 8×8 grid of project slots visible.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Rename project <span class="badge badge-server">SERVER</span></div>
+    <div class="test-steps"><ol>
+      <li>Right-click a project → Rename</li>
+      <li>Type new name → confirm</li>
+    </ol></div>
+    <div class="expected">✓ Name updates. Server PUT /api/sessions/:id called.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Delete project <span class="badge badge-server">SERVER</span></div>
+    <div class="test-steps"><ol>
+      <li>Delete a project</li>
+    </ol></div>
+    <div class="expected">✓ Slot resets to empty. DELETE /api/sessions/:id called.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Scene list <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click a project → view scenes panel</li>
+    </ol></div>
+    <div class="expected">✓ 8 scene slots shown per project. Scenes display (may be empty).</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>8 — MIDI Tester Tool</h2>
+
+<div class="callout">
+  Open in a separate tab: <strong>http://localhost:5173/midi-tester.html</strong>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Enable MIDI + port selection <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click <strong>Enable MIDI</strong> → Allow in browser dialog</li>
+      <li>Click <strong>Both</strong> next to "Circuit Tracks MIDI 1"</li>
+    </ol></div>
+    <div class="expected">✓ Active port shows IN and OUT names. Status "MIDI access granted".</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">MIDI IN monitor — play a note on device <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Press any key on the Circuit Tracks keyboard</li>
+    </ol></div>
+    <div class="expected">✓ Green "NOTE ON" row appears in monitor. Note number and velocity shown. Red "NOTE OFF" on release.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Send CC <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Set Ch=1, CC=74, Val=127 → click <strong>Send CC</strong></li>
+      <li>Set Val=0 → Send CC</li>
+    </ol></div>
+    <div class="expected">✓ Filter cutoff sweeps on device. Status line confirms "Sent CC 74 = 127 on ch1".</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Quick test — Request Current Patch Syn 1 <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Click <strong>Request Current Patch — Syn 1</strong></li>
+    </ol></div>
+    <div class="expected">✓ Orange SYSEX row appears in monitor: <span class="code">F0 00 20 29 01 64 02 00 ...</span> (long response). Device echoes current patch.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Quick test — Request Current Patch Syn 2 <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Click <strong>Request Current Patch — Syn 2</strong></li>
+    </ol></div>
+    <div class="expected">✓ SYSEX row appears. Bank byte at position 7 = <span class="code">01</span> (Synth 2). Different from Syn 1 response.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Quick test — Macros sweep <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click <strong>Macros CC80–87 sweep</strong></li>
+    </ol></div>
+    <div class="expected">✓ 8 blue CC rows appear: 80=127…87=127, then 80=0…87=0 (with 50ms gaps). Macro LEDs on device light up and fade.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">SysEx raw send + validation <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Enter <span class="code">F0 7E 7F 06 01 F7</span> in SysEx textarea → <strong>Send SysEx</strong></li>
+      <li>Try invalid: <span class="code">00 FF</span> → Send</li>
+    </ol></div>
+    <div class="expected">✓ Valid SysEx: SYSEX row appears in monitor. Invalid: red error "Must start with F0".</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Transport buttons <span class="badge badge-midi">MIDI</span></div>
+    <div class="test-steps"><ol>
+      <li>Click ▶ Start → ■ Stop → ▶▶ Continue</li>
+    </ol></div>
+    <div class="expected">✓ Device starts/stops/continues. Purple transport rows in monitor for each button press.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>9 — Cross-cutting: WebSocket & Server Relay</h2>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">WebSocket reconnect <span class="badge badge-ws">WS</span></div>
+    <div class="test-steps"><ol>
+      <li>Stop server (<span class="code">Ctrl+C</span>)</li>
+      <li>Wait 5 seconds — check status bar</li>
+      <li>Restart server</li>
+    </ol></div>
+    <div class="expected">✓ Status bar shows "Disconnected" while server is down. Reconnects automatically within ~3 seconds after server restarts.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Server-initiated patch dump updates client <span class="badge badge-ws">WS</span></div>
+    <div class="test-steps"><ol>
+      <li>Use MIDI Tester to send: Request Current Patch Syn 1</li>
+      <li>Switch to main app → Patches tab</li>
+    </ol></div>
+    <div class="expected">✓ Patch at activePatchIndex updates with name/params from device. Knobs reflect received values.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Synth 2 WebSocket patch routing <span class="badge badge-ws">WS</span></div>
+    <div class="test-steps"><ol>
+      <li>In MIDI Tester: click <strong>Request Current Patch — Syn 2</strong></li>
+      <li>In main app: switch to Synth 2 patches list</li>
+    </ol></div>
+    <div class="expected">✓ <span class="code">patch:currentDump</span> event has <span class="code">track:1</span>. Synth 2 slot in client is updated (NOT Synth 1).</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">CC from device updates mixer <span class="badge badge-ws">WS</span></div>
+    <div class="test-steps"><ol>
+      <li>Disconnect Web MIDI port in Device tab (to force server path)</li>
+      <li>Turn a macro knob on the device</li>
+    </ol></div>
+    <div class="expected">✓ Mixer tab macro display updates. MIDI IN indicator flashes. CC value arrives via WebSocket (not Web MIDI).</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>10 — Edge Cases &amp; Error Handling</h2>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">SysEx while disconnected <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Unplug USB cable</li>
+      <li>In Patches tab, click a patch to audition it</li>
+    </ol></div>
+    <div class="expected">✓ No crash. Error logged to console (DEV). No stuck spinner.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Import malformed .syx <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Create a text file, rename to <span class="code">bad.syx</span></li>
+      <li>Try to import it</li>
+    </ol></div>
+    <div class="expected">✓ Error toast "No valid patches found". No crash. Existing patches unchanged.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Rapid tab switching doesn't break stores <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Quickly click through all 7 tabs 3× in a row</li>
+      <li>Check DevTools console</li>
+    </ol></div>
+    <div class="expected">✓ No errors. UI settles on last tab. State preserved.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Keyboard shortcuts <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Press keys 1–7 on keyboard (not in an input field)</li>
+      <li>Press Space to toggle Play/Stop</li>
+      <li>Press Escape to Stop</li>
+    </ol></div>
+    <div class="expected">✓ Keys 1–7 navigate tabs. Space toggles transport. Esc stops. No action in text inputs.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Multiple simultaneous knob updates don't race <span class="badge badge-sysex">SYSEX</span></div>
+    <div class="test-steps"><ol>
+      <li>Rapidly change Cutoff + Resonance + LFO Rate within 30ms</li>
+    </ol></div>
+    <div class="expected">✓ Only one SysEx is sent (the last value for each param, merged). No duplicate SysEx bursts.</div>
+  </div>
+</div>
+
+<div class="test-item">
+  <div class="cb"></div>
+  <div class="test-body">
+    <div class="test-title">Page reload preserves nothing (stateless) <span class="badge badge-ui">UI</span></div>
+    <div class="test-steps"><ol>
+      <li>Load patches from device</li>
+      <li>Reload the page (F5)</li>
+    </ol></div>
+    <div class="expected">✓ Patch list resets to empty after reload (in-memory only — by design). No crash on reload.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>Known Limitations — Do Not File as Bugs</h2>
+
+<div class="limitation">Firmware version is always "unknown" — SysEx query not implemented.</div>
+<div class="limitation">Firmware update via .syx file is a UI placeholder — not functional.</div>
+<div class="limitation">Effect type (Distortion/Chorus) resets to first option on page reload (sent via NRPN, not in patch SysEx data).</div>
+<div class="limitation">Delay and Reverb preset selection in Effects tab is display-only — Circuit Tracks has no remote CC/SysEx for preset selection.</div>
+<div class="limitation">CC-based tempo is approximate — only 128 steps for 40–240 BPM range (~1.6 BPM resolution).</div>
+<div class="limitation">Web MIDI (and SysEx) requires Chrome or Edge — Firefox/Safari not supported.</div>
+<div class="limitation">Mute/Solo in Mixer is UI-only — no MIDI CC for these on Circuit Tracks.</div>
+<div class="limitation">Sample transfer to device via MIDI not available — use SD card or Novation Components.</div>
+<div class="limitation">Synth 1/2 tracks in Sequencer don't trigger notes (MIDI path is external) — only Drum and MIDI tracks trigger NoteOn.</div>
+<div class="limitation">Undo/Redo keyboard shortcuts (Ctrl+Z) are captured but not implemented.</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>Sign-off</h2>
+
+<table class="summary-table" style="margin-top:8px">
+  <tr><th>Area</th><th>Pass / Fail / N/A</th><th>Notes</th></tr>
+  <tr><td>Device connection &amp; global settings</td><td style="width:120px"></td><td></td></tr>
+  <tr><td>Patches — list, fetch, audition, import/export</td><td></td><td></td></tr>
+  <tr><td>Patches — Synth editor (knobs, SysEx debounce)</td><td></td><td></td></tr>
+  <tr><td>Patches — Effects editor</td><td></td><td></td></tr>
+  <tr><td>Patches — Modulation matrix</td><td></td><td></td></tr>
+  <tr><td>Samples — load, preview, rename, delete</td><td></td><td></td></tr>
+  <tr><td>Sequencer — grid, transport, MIDI clock sync</td><td></td><td></td></tr>
+  <tr><td>Mixer — faders, pan, macros from device</td><td></td><td></td></tr>
+  <tr><td>MIDI Settings</td><td></td><td></td></tr>
+  <tr><td>Sessions</td><td></td><td></td></tr>
+  <tr><td>MIDI Tester tool</td><td></td><td></td></tr>
+  <tr><td>WebSocket relay + reconnect</td><td></td><td></td></tr>
+  <tr><td>Edge cases &amp; error handling</td><td></td><td></td></tr>
+</table>
+
+<div style="margin-top:16px; display:flex; gap:40px; font-size:10px; color:#555;">
+  <div>
+    Tester signature: ________________________________<br>
+    <span style="color:#aaa">Date: _______________</span>
+  </div>
+  <div>
+    Overall result: &nbsp;
+    <span style="border:1.5px solid #4caf50; padding:2px 12px; border-radius:3px; font-weight:700; color:#2e7d32;">PASS</span>
+    &nbsp;&nbsp;
+    <span style="border:1.5px solid #f44336; padding:2px 12px; border-radius:3px; font-weight:700; color:#b71c1c;">FAIL</span>
+  </div>
+</div>
+
+<div style="margin-top:24px; font-size:9px; color:#aaa; text-align:center; border-top:1px solid #eee; padding-top:10px;">
+  Novation Circuit Tracks Web UI — Manual Test Checklist — generated 2026-03-27
+</div>
+
+</body>
+</html>
