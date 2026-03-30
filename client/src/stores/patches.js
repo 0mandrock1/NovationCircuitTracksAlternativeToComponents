@@ -148,7 +148,7 @@ export const usePatchesStore = defineStore('patches', () => {
   async function writeToDevice(index) {
     const slot = patches.value[activeTrack.value][index]
     if (!slot?.rawBytes) return
-    await sendSysEx(buildWritePatch(slot.rawBytes, index))
+    await sendSysEx(buildWritePatch(slot.rawBytes, index, activeTrack.value))
   }
 
   /** Write all patches that have data to the device bank. */
@@ -165,7 +165,7 @@ export const usePatchesStore = defineStore('patches', () => {
         const slot = patches.value[activeTrack.value][i]
         if (slot?.rawBytes) {
           try {
-            await sendSysEx(buildWritePatch(slot.rawBytes, i))
+            await sendSysEx(buildWritePatch(slot.rawBytes, i, activeTrack.value))
           } catch {
             sendProgress.value.failed++
           }

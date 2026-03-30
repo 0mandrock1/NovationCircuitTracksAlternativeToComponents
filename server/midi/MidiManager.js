@@ -181,7 +181,7 @@ class MidiManager {
         clearTimeout(pending.timer)
         this._pendingResponses.delete(cmd)
         pending.resolve(bytes)
-        return  // consumed by pending request — don't broadcast
+        // fall through to also broadcast via 'sysex' event
       }
     }
 
