@@ -122,7 +122,7 @@ router.post('/:index/write', async (req, res) => {
 
   const raw = banks[track][index].rawBytes ?? defaultPatchBytes(index)
   try {
-    await midiManager.sendSysEx(buildWritePatch(raw, index))
+    await midiManager.sendSysEx(buildWritePatch(raw, index, _synthSelector(track)))
     res.json({ ok: true, index, name: banks[track][index].name })
   } catch (err) {
     res.status(500).json({ error: err.message })
