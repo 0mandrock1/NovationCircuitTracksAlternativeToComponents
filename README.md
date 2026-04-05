@@ -1,3 +1,4 @@
+#DEPRECATED
 # Novation Circuit Tracks — Web UI
 
 A browser-based alternative to **Novation Components** for the Novation Circuit Tracks synthesizer/sequencer.
