@@ -32,12 +32,19 @@ export const useSamplesStore = defineStore('samples', () => {
   }
 
   function renameSample(index, name) {
-    samples.value[index].name = name.slice(0, 16)
+    const trimmed = name.slice(0, 16)
+    samples.value[index].name = trimmed
+    fetch(`/api/samples/${index}/rename`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmed }),
+    }).catch(() => {})
   }
 
   function deleteSample(index) {
     if (samples.value[index].audioUrl) URL.revokeObjectURL(samples.value[index].audioUrl)
     samples.value[index] = _emptySlot(index)
+    fetch(`/api/samples/${index}`, { method: 'DELETE' }).catch(() => {})
   }
 
   function exportSample(index) {
