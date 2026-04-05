@@ -3,6 +3,7 @@
 A browser-based alternative to **Novation Components** for the Novation Circuit Tracks synthesizer/sequencer.
 Provides a full-featured interface for editing synth patches, managing drum samples, configuring MIDI, editing sequences, and managing sessions — without installing any native app.
 
+HOSTED AT: https://novation-circuit-tracks-alternative.vercel.app
 ---
 
 ## Features
