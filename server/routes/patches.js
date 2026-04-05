@@ -141,7 +141,7 @@ router.post('/:index/fetch', async (req, res) => {
     const parsed = parseSysEx(resp)
     if (!parsed || parsed.type !== 'patchDump') return res.status(500).json({ error: 'Unexpected SysEx response' })
     banks[track][index] = _slotFromRaw(parsed.rawBytes, index)
-    res.json({ ok: true, patch: { index, name: banks[track][index].name, params: banks[track][index].params } })
+    res.json({ ok: true, patch: { index, name: banks[track][index].name, params: banks[track][index].params, rawBytes: banks[track][index].rawBytes } })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { sendSysEx, sendSysExAndWait } from '@/composables/useMidi.js'
+import { sendSysEx, sendSysExAndWait, isConnected as midiIsConnected } from '@/composables/useMidi.js'
 import {
   buildRequestPatchDump, buildRequestCurrentPatch, buildReplaceCurrentPatch, buildWritePatch,
   buildPatchDumpMessage, buildBankSyx, parseSyxFile, parseSysEx, decodePatchName,
-  paramsToBytesPartial, rawBytesToParams, defaultPatchBytes,
+  encodePatchName, paramsToBytesPartial, rawBytesToParams, defaultPatchBytes,
 } from '@/midi/sysex.js'
 import { CMD_PATCH_DUMP, CMD_CURRENT_PATCH_DUMP, SYNTH_TRACK_1, SYNTH_TRACK_2, SYSEX_MIN_DELAY_MS } from '@/midi/constants.js'
 
@@ -42,6 +42,9 @@ export const usePatchesStore = defineStore('patches', () => {
   let _cancelFetch = false
   let _cancelSend  = false
 
+  // loading is an alias for fetchingAll — PatchList.vue uses store.loading
+  const loading = fetchingAll
+
   const patches = ref({
     0: Array.from({ length: 64 }, (_, i) => _emptySlot(i)),
     1: Array.from({ length: 64 }, (_, i) => _emptySlot(i)),
@@ -52,17 +55,35 @@ export const usePatchesStore = defineStore('patches', () => {
   // ── Fetch from device ────────────────────────────────────────────────────────
 
   async function fetchFromDevice(index, timeout = FETCH_ONE_TIMEOUT_MS) {
-    try {
-      const raw    = await sendSysExAndWait(buildRequestPatchDump(index, _synthTrack(activeTrack.value)), CMD_PATCH_DUMP, timeout)
-      const parsed = parseSysEx(raw)
-      if (parsed?.type === 'patchDump') {
-        patches.value[activeTrack.value][index] = {
-          index, name: parsed.params.name, hasData: true,
-          params: parsed.params, rawBytes: parsed.rawBytes,
+    // Try Web MIDI first (direct, low-latency)
+    if (midiIsConnected()) {
+      try {
+        const raw    = await sendSysExAndWait(buildRequestPatchDump(index, _synthTrack(activeTrack.value)), CMD_PATCH_DUMP, timeout)
+        const parsed = parseSysEx(raw)
+        if (parsed?.type === 'patchDump') {
+          patches.value[activeTrack.value][index] = {
+            index, name: parsed.params.name, hasData: true,
+            params: parsed.params, rawBytes: parsed.rawBytes,
+          }
+          return true
         }
-        return true
+      } catch {
+        // fall through to REST fallback
       }
-      return false
+    }
+
+    // Fallback: ask server to fetch via its MIDI connection
+    try {
+      const res  = await fetch(`/api/patches/${index}/fetch?track=${activeTrack.value}`, { method: 'POST' })
+      if (!res.ok) return false
+      const data = await res.json()
+      if (!data.ok || !data.patch?.rawBytes) return false
+      const raw    = data.patch.rawBytes
+      const params = data.patch.params ?? rawBytesToParams(raw)
+      patches.value[activeTrack.value][index] = {
+        index, name: data.patch.name, hasData: true, params, rawBytes: raw,
+      }
+      return true
     } catch {
       return false
     }
@@ -242,9 +263,19 @@ export const usePatchesStore = defineStore('patches', () => {
     }
   }
 
+  function initializePatch(index) {
+    const raw    = defaultPatchBytes(index)
+    const params = rawBytesToParams(raw)
+    patches.value[activeTrack.value][index] = {
+      index, name: params.name, hasData: true, params, rawBytes: raw,
+    }
+  }
+
   function renamePatch(index, name) {
     const slot = patches.value[activeTrack.value][index]
-    if (slot) slot.name = name
+    if (!slot) return
+    slot.name = name
+    if (slot.rawBytes) slot.rawBytes = encodePatchName(name, slot.rawBytes)
   }
 
   function deletePatch(index) {
@@ -253,12 +284,12 @@ export const usePatchesStore = defineStore('patches', () => {
 
   return {
     patches, activeTrack, activePatchIndex, activePatch,
-    fetchingAll, sendingAll, fetchProgress, sendProgress, error,
+    fetchingAll, sendingAll, fetchProgress, sendProgress, error, loading,
     fetchFromDevice, fetchAllFromDevice, cancelFetchAll, fetchCurrentPatch,
     sendToDevice, writeToDevice, sendAllToDevice, cancelSendAll,
     updateParam,
     exportPatchSyx, exportBankSyx, importSyx,
-    renamePatch, deletePatch,
+    initializePatch, renamePatch, deletePatch,
     handleWsPatchUpdate, handleWsCurrentDump,
   }
 })

@@ -139,13 +139,29 @@ const activeProgress = computed(() =>
 
       <!-- Editor -->
       <div class="patches-view__editor">
-        <template v-if="store.activePatch">
+        <template v-if="store.activePatch?.hasData">
           <SynthEditor   v-if="subTab === 'synth'"  :patch="store.activePatch" :patch-index="store.activePatchIndex" />
           <MacroEditor   v-else-if="subTab === 'macros'" :patch="store.activePatch" :patch-index="store.activePatchIndex" />
           <EffectsEditor v-else-if="subTab === 'fx'"     :patch="store.activePatch" :patch-index="store.activePatchIndex" />
           <ModMatrix     v-else-if="subTab === 'mod'"    :patch="store.activePatch" :patch-index="store.activePatchIndex" />
         </template>
-        <div v-else class="patches-view__empty">Select a patch from the list.</div>
+        <div v-else class="patches-view__empty">
+          <p>Patch {{ String(store.activePatchIndex + 1).padStart(2, '0') }} has no data.</p>
+          <p class="patches-view__empty-hint">Fetch it from the device or create a new one:</p>
+          <div class="patches-view__empty-actions">
+            <button
+              class="btn btn--sm"
+              :disabled="!device.connected || store.fetchingAll"
+              @click="store.fetchFromDevice(store.activePatchIndex)"
+              :title="device.connected ? 'Fetch this patch from device' : 'Connect device first'"
+            >↓ Fetch from device</button>
+            <button
+              class="btn btn--sm"
+              @click="store.initializePatch(store.activePatchIndex)"
+              title="Start with default patch values"
+            >+ New patch</button>
+          </div>
+        </div>
       </div>
 
       <!-- Mini keyboard for patch preview (sends NoteOn/Off to device) -->
@@ -356,5 +372,15 @@ const activeProgress = computed(() =>
 .subtab--active { color: var(--color-accent); border-bottom-color: var(--color-accent); }
 
 .patches-view__editor { flex: 1; overflow-y: auto; padding-top: var(--spacing-sm); }
-.patches-view__empty { color: var(--color-text-muted); padding: var(--spacing-md); font-size: 0.9rem; }
+.patches-view__empty {
+  color: var(--color-text-muted);
+  padding: var(--spacing-md);
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+.patches-view__empty p { margin: 0; }
+.patches-view__empty-hint { font-size: 0.8rem; }
+.patches-view__empty-actions { display: flex; gap: var(--spacing-xs); margin-top: var(--spacing-xs); }
 </style>
