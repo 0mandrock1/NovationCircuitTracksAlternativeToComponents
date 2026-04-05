@@ -1,6 +1,19 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { sendCC, on, isConnected } from '@/composables/useMidi.js'
+import { sendCC as midiSendCC, on, isConnected } from '@/composables/useMidi.js'
+
+// Send CC via Web MIDI if connected, otherwise via server REST bridge
+function sendCC(channel, controller, value) {
+  if (isConnected()) {
+    midiSendCC(channel, controller, value)
+  } else {
+    fetch('/api/mixer/cc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel, controller, value }),
+    }).catch(() => {})
+  }
+}
 
 // Source: Circuit Tracks Programmer's Reference Guide v3
 //
