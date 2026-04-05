@@ -5,12 +5,13 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "cd client && npm run dev",
-    "dev:server": "cd server && npm run dev",
+    "dev:server": "cd server && cross-env NODE_ENV=development npm run dev",
     "build": "cd client && npm run build",
     "install:all": "npm install && cd client && npm install && cd ../server && npm install",
     "vercel:build": "cd client && npm install && npm run build"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "cross-env": "^10.1.0"
   }
 }

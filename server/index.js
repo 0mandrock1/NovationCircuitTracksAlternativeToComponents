@@ -38,11 +38,30 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, version: '1.0.0' })
 })
 
-// Serve built frontend in production
-app.use(express.static(CLIENT_DIST))
-app.get('*', (req, res) => {
-  res.sendFile(join(CLIENT_DIST, 'index.html'))
-})
+const isDev = process.env.NODE_ENV !== 'production'
+
+if (isDev) {
+  // In dev mode proxy all non-API requests to the Vite dev server.
+  // This lets both localhost:3000 and localhost:5173 work.
+  const { createProxyMiddleware } = await import('http-proxy-middleware')
+  const VITE_URL = process.env.VITE_URL || 'http://localhost:5173'
+  app.use('/', createProxyMiddleware({
+    target: VITE_URL,
+    changeOrigin: true,
+    ws: false,          // WS is handled by the Vite proxy on port 5173
+    logLevel: 'silent',
+    on: {
+      error: (err, req, res) => {
+        if (!res.headersSent) res.status(502).send('Vite dev server not ready — start it with npm run dev:client')
+      }
+    }
+  }))
+} else {
+  app.use(express.static(CLIENT_DIST))
+  app.get('*', (req, res, next) => {
+    res.sendFile(join(CLIENT_DIST, 'index.html'), (err) => { if (err) next(err) })
+  })
+}
 
 // Error handler
 app.use((err, req, res, next) => {
@@ -51,8 +70,35 @@ app.use((err, req, res, next) => {
 })
 
 const server = createServer(app)
+
+// Must be registered BEFORE setupWebSocket so it fires first and can exit
+// cleanly before the ws package re-emits the error without a handler.
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n[server] Port ${PORT} is already in use. Kill the old process and restart.\n`)
+    process.exit(1)
+  } else {
+    throw err
+  }
+})
+
 setupWebSocket(server)
 
 server.listen(PORT, () => {
-  console.log(`Circuit Tracks server running on http://localhost:${PORT}`)
+  if (isDev) {
+    console.log(`[server] API + WS on http://localhost:${PORT}`)
+    console.log(`[server] Open the app at http://localhost:5173  (Vite dev server)`)
+    console.log(`[server]   — or —  http://localhost:${PORT}  (proxied through Express)`)
+  } else {
+    console.log(`Circuit Tracks server running on http://localhost:${PORT}`)
+  }
 })
+
+// Graceful shutdown so node --watch can reclaim the port immediately
+function shutdown() {
+  server.closeAllConnections?.()
+  server.close(() => process.exit(0))
+  setTimeout(() => process.exit(0), 500).unref()
+}
+process.on('SIGTERM', shutdown)
+process.on('SIGINT',  shutdown)
